@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Big, readable base. The whole app is designed for a phone in
+   daylight and a dim old monitor. */
+html {
+  font-size: 17px;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900;
+}
+
+/* Every interactive control gets a comfortable tap target. */
+.btn {
+  @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5 font-semibold no-underline;
+}
+.btn-primary {
+  @apply btn bg-accent text-white text-lg shadow-sm active:bg-accent-dark;
+}
+.btn-secondary {
+  @apply btn border-2 border-stone-300 bg-white text-stone-800 active:bg-stone-100;
+}
+.btn-danger {
+  @apply btn border-2 border-red-200 bg-white text-red-700 active:bg-red-50;
+}
+
+.field {
+  @apply block w-full min-h-[48px] rounded-xl border-2 border-stone-300 bg-white px-3 py-2 text-base focus:border-accent focus:outline-none;
+}
+.label {
+  @apply mb-1 block font-medium text-stone-700;
+}
+
+/* ---------- print ---------- */
+@media print {
+  body {
+    background: white !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+}
