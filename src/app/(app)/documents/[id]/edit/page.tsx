@@ -18,7 +18,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
   ]);
   if (!doc) notFound();
 
-  const { clients, profile, recentDescriptions } = formData;
+  const { clients, profile, rateCard, recentDescriptions } = formData;
 
   return (
     <main>
@@ -26,7 +26,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         <Link href={`/documents/${doc.id}`} className="btn-secondary px-3">
           ← {t.back}
         </Link>
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-extrabold">
           {t.edit} · {doc.serial_no}
         </h1>
       </div>
@@ -46,10 +46,13 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
           qty: String(i.qty),
           unit: i.unit,
           rate: String(i.rate),
+          hsn: i.hsn_sac ?? "",
         }))}
         clients={clients}
+        rateCard={rateCard}
         gstEnabled={profile?.gst_enabled ?? false}
         gstRate={Number(profile?.gst_rate ?? 0.18)}
+        defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
         t={t}
       />

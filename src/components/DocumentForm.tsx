@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import RatePicker from "@/components/RatePicker";
+import ScanSheet from "@/components/ScanSheet";
 import { formatINR } from "@/lib/format";
 import type { Dict } from "@/lib/i18n";
-import { UNITS } from "@/lib/types";
+import { STATES, UNITS, type RateCardItem, type ScannedItem } from "@/lib/types";
 
 interface ItemState {
   description: string;
   qty: string;
   unit: string;
   rate: string;
+  hsn: string;
 }
 
 interface Props {
@@ -25,13 +28,21 @@ interface Props {
   };
   initialItems: ItemState[];
   clients: { id: string; name: string }[];
+  rateCard: RateCardItem[];
   gstEnabled: boolean;
   gstRate: number;
+  defaultHsn: string;
   recentDescriptions: string[];
   t: Dict;
 }
 
-const emptyItem = (): ItemState => ({ description: "", qty: "1", unit: "Nos", rate: "" });
+const emptyItem = (hsn: string): ItemState => ({
+  description: "",
+  qty: "1",
+  unit: "Nos",
+  rate: "",
+  hsn,
+});
 
 export default function DocumentForm({
   action,
@@ -40,21 +51,23 @@ export default function DocumentForm({
   initial,
   initialItems,
   clients,
+  rateCard,
   gstEnabled,
   gstRate,
+  defaultHsn,
   recentDescriptions,
   t,
 }: Props) {
   const draftKey = `ezmoney-draft-${id ?? "new-" + type}`;
   const [items, setItems] = useState<ItemState[]>(
-    initialItems.length > 0 ? initialItems : [emptyItem()]
+    initialItems.length > 0 ? initialItems : [emptyItem(defaultHsn)]
   );
   const [clientId, setClientId] = useState(initial.client_id);
   const [docDate, setDocDate] = useState(initial.doc_date);
   const [siteJob, setSiteJob] = useState(initial.site_job);
   const [notes, setNotes] = useState(initial.notes);
   const [status, setStatus] = useState(initial.status);
-  const [newClient, setNewClient] = useState({ name: "", phone: "", address: "" });
+  const [newClient, setNewClient] = useState({ name: "", phone: "", address: "", state: "29" });
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const loaded = useRef(false);
@@ -108,11 +121,42 @@ export default function DocumentForm({
         qty: Number(i.qty) || 0,
         unit: i.unit,
         rate: Number(i.rate) || 0,
+        hsn_sac: i.hsn.trim(),
       }))
   );
 
   const update = (idx: number, patch: Partial<ItemState>) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  /** Drop rows in, replacing a single blank starter row. */
+  const appendRows = (rows: ItemState[]) =>
+    setItems((prev) => {
+      const base =
+        prev.length === 1 && !prev[0].description.trim() && !prev[0].rate ? [] : prev;
+      return [...base, ...rows];
+    });
+
+  const addFromRateCard = (item: RateCardItem) =>
+    appendRows([
+      {
+        description: item.description,
+        qty: "1",
+        unit: item.unit,
+        rate: String(item.rate),
+        hsn: item.hsn_sac || defaultHsn,
+      },
+    ]);
+
+  const addFromScan = (scanned: ScannedItem[]) =>
+    appendRows(
+      scanned.map((s) => ({
+        description: s.description,
+        qty: String(s.qty),
+        unit: s.unit,
+        rate: String(s.rate),
+        hsn: defaultHsn,
+      }))
+    );
 
   const statusOptions =
     type === "estimate" ? ["draft", "sent", "approved", "rejected"] : ["draft", "sent", "paid"];
@@ -128,14 +172,14 @@ export default function DocumentForm({
           /* ignore */
         }
       }}
-      className="space-y-5"
+      className="space-y-5 pb-4"
     >
       {id && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="items_json" value={itemsJson} />
 
       {restored && (
-        <p className="rounded-xl bg-amber-50 p-3 text-center font-medium text-amber-900">
+        <p className="rounded-2xl bg-amber-50 p-3 text-center font-semibold text-amber-900">
           {t.draftRestored}
         </p>
       )}
@@ -161,7 +205,7 @@ export default function DocumentForm({
           <option value="__new">{t.addNewClient}</option>
         </select>
         {clientId === "__new" && (
-          <div className="mt-3 space-y-3 rounded-xl bg-white p-4 shadow-sm">
+          <div className="card mt-3 space-y-3 p-4">
             <input
               name="new_client_name"
               value={newClient.name}
@@ -185,6 +229,21 @@ export default function DocumentForm({
               placeholder={t.clientAddress}
               className="field"
             />
+            {gstEnabled && (
+              <select
+                name="new_client_state"
+                value={newClient.state}
+                onChange={(e) => setNewClient({ ...newClient, state: e.target.value })}
+                className="field"
+                aria-label={t.clientState}
+              >
+                {STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
       </div>
@@ -219,14 +278,21 @@ export default function DocumentForm({
       {/* line items */}
       <div>
         <p className="label">{t.items}</p>
+
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <RatePicker items={rateCard} t={t} onPick={addFromRateCard} />
+          <ScanSheet t={t} onAdd={addFromScan} />
+        </div>
+
         <datalist id="recent-descriptions">
           {recentDescriptions.map((d) => (
             <option key={d} value={d} />
           ))}
         </datalist>
+
         <div className="space-y-3">
           {items.map((item, idx) => (
-            <div key={idx} className="rounded-xl bg-white p-3 shadow-sm">
+            <div key={idx} className="card p-3">
               <input
                 value={item.description}
                 onChange={(e) => update(idx, { description: e.target.value })}
@@ -266,24 +332,38 @@ export default function DocumentForm({
                   />
                 </div>
               </div>
+
+              {gstEnabled && (
+                <div className="mt-2">
+                  <label className="mb-0.5 block text-xs text-stone-500">{t.hsn}</label>
+                  <input
+                    value={item.hsn}
+                    onChange={(e) => update(idx, { hsn: e.target.value })}
+                    inputMode="numeric"
+                    className="field px-2"
+                  />
+                </div>
+              )}
+
               <div className="mt-2 flex items-center justify-between">
                 <button
                   type="button"
                   onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                  className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-700 active:bg-red-50"
+                  className="min-h-[44px] rounded-xl px-3 text-sm font-semibold text-red-700 active:bg-red-50"
                 >
                   ✕ {t.delete}
                 </button>
-                <span className="font-semibold">
+                <span className="tnum font-bold">
                   {formatINR((Number(item.qty) || 0) * (Number(item.rate) || 0))}
                 </span>
               </div>
             </div>
           ))}
         </div>
+
         <button
           type="button"
-          onClick={() => setItems((prev) => [...prev, emptyItem()])}
+          onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn)])}
           className="btn-secondary mt-3 w-full"
         >
           ＋ {t.addItem}
@@ -291,22 +371,22 @@ export default function DocumentForm({
       </div>
 
       {/* totals */}
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="card p-4">
         <div className="flex justify-between text-stone-600">
           <span>{t.subtotal}</span>
-          <span>{formatINR(subtotal)}</span>
+          <span className="tnum">{formatINR(subtotal)}</span>
         </div>
         {gstEnabled && (
           <div className="mt-1 flex justify-between text-stone-600">
             <span>
               {t.gst} ({(gstRate * 100).toFixed(0)}%)
             </span>
-            <span>{formatINR(gstAmount)}</span>
+            <span className="tnum">{formatINR(gstAmount)}</span>
           </div>
         )}
-        <div className="mt-2 flex justify-between border-t border-stone-200 pt-2 text-xl font-bold">
+        <div className="mt-2 flex justify-between border-t border-line pt-2 text-xl font-extrabold">
           <span>{t.total}</span>
-          <span>{formatINR(total)}</span>
+          <span className="tnum">{formatINR(total)}</span>
         </div>
       </div>
 
@@ -343,7 +423,11 @@ export default function DocumentForm({
         />
       </div>
 
-      <button type="submit" disabled={saving} className="btn-primary w-full text-xl disabled:opacity-60">
+      <button
+        type="submit"
+        disabled={saving}
+        className="btn-primary w-full text-xl disabled:opacity-60"
+      >
         {saving ? "…" : t.save}
       </button>
     </form>

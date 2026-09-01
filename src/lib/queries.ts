@@ -1,18 +1,22 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/format";
-import type { BusinessProfile } from "@/lib/types";
+import type { BusinessProfile, RateCardItem } from "@/lib/types";
 
 export async function getFormData() {
   const supabase = supabaseServer();
-  const [{ data: clients }, { data: profile }, { data: recentItems }] = await Promise.all([
-    supabase.from("clients").select("id, name").order("name"),
-    supabase.from("business_profile").select("*").maybeSingle(),
-    supabase
-      .from("line_items")
-      .select("description")
-      .order("id", { ascending: false })
-      .limit(100),
-  ]);
+  const [{ data: clients }, { data: profile }, { data: rateCard }, { data: recentItems }] =
+    await Promise.all([
+      supabase.from("clients").select("id, name").order("name"),
+      supabase.from("business_profile").select("*").maybeSingle(),
+      supabase
+        .from("rate_card_items")
+        .select("id, description, unit, rate, hsn_sac, category, times_used")
+        .order("times_used", { ascending: false })
+        .order("description")
+        .limit(200),
+      supabase.from("line_items").select("description").order("id", { ascending: false }).limit(100),
+    ]);
+
   const seen = new Set<string>();
   const recentDescriptions: string[] = [];
   for (const r of recentItems ?? []) {
@@ -23,10 +27,20 @@ export async function getFormData() {
     }
     if (recentDescriptions.length >= 25) break;
   }
+
   return {
     clients: clients ?? [],
     profile: (profile as BusinessProfile | null) ?? null,
+    rateCard: (rateCard as RateCardItem[] | null) ?? [],
     recentDescriptions,
     today: todayISO(),
   };
+}
+
+/** A short-lived link to a receipt photo in private storage. */
+export async function receiptUrl(path: string | null): Promise<string | null> {
+  if (!path) return null;
+  const supabase = supabaseServer();
+  const { data } = await supabase.storage.from("receipts").createSignedUrl(path, 60 * 30);
+  return data?.signedUrl ?? null;
 }

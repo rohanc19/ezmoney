@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ExpenseForm from "@/components/ExpenseForm";
+import { saveExpense } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
 import { todayISO } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -17,9 +18,9 @@ export default async function NewExpensePage() {
         <Link href="/expenses" className="btn-secondary px-3">
           ← {t.back}
         </Link>
-        <h1 className="text-2xl font-bold">{t.addExpense}</h1>
+        <h1 className="text-2xl font-extrabold">{t.addExpense}</h1>
       </div>
-      <ExpenseForm t={t} today={todayISO()} clients={clients ?? []} />
+      <ExpenseForm t={t} today={todayISO()} clients={clients ?? []} action={saveExpense} />
     </main>
   );
 }

@@ -13,7 +13,7 @@ export default async function NewDocumentPage({
 }) {
   const t = getDict();
   const type = searchParams.type === "invoice" ? "invoice" : "estimate";
-  const { clients, profile, recentDescriptions, today } = await getFormData();
+  const { clients, profile, rateCard, recentDescriptions, today } = await getFormData();
 
   return (
     <main>
@@ -21,7 +21,9 @@ export default async function NewDocumentPage({
         <Link href="/" className="btn-secondary px-3">
           ← {t.back}
         </Link>
-        <h1 className="text-2xl font-bold">{type === "invoice" ? t.newInvoice : t.newEstimate}</h1>
+        <h1 className="text-2xl font-extrabold">
+          {type === "invoice" ? t.newInvoice : t.newEstimate}
+        </h1>
       </div>
       <DocumentForm
         action={saveDocument}
@@ -29,8 +31,10 @@ export default async function NewDocumentPage({
         initial={{ doc_date: today, client_id: "", site_job: "", notes: "", status: "draft" }}
         initialItems={[]}
         clients={clients}
+        rateCard={rateCard}
         gstEnabled={profile?.gst_enabled ?? false}
         gstRate={Number(profile?.gst_rate ?? 0.18)}
+        defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
         t={t}
       />

@@ -2,38 +2,191 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Big, readable base. The whole app is designed for a phone in
-   daylight and a dim old monitor. */
+/* =============================================================
+   Fonts — all self-hosted so the old PC never waits on Google.
+   Each face declares a unicode-range, so the browser downloads
+   only what the page actually needs (Kannada is fetched only
+   when he switches the app to Kannada).
+   ============================================================= */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope-latin.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F,
+    U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+/* The ₹ sign (U+20B9) is missing from fonts on older Windows machines,
+   which draw a tofu box instead. ~700 bytes each, this character only. */
+@font-face {
+  font-family: "Rupee";
+  src: url("/fonts/rupee-regular.woff2") format("woff2");
+  font-weight: 100 600;
+  font-display: swap;
+  unicode-range: U+20B9;
+}
+@font-face {
+  font-family: "Rupee";
+  src: url("/fonts/rupee-bold.woff2") format("woff2");
+  font-weight: 601 900;
+  font-display: swap;
+  unicode-range: U+20B9;
+}
+
+/* Kannada, for when the app is switched to ಕನ್ನಡ. */
+@font-face {
+  font-family: "Kannada";
+  src: url("/fonts/kannada-400.woff2") format("woff2");
+  font-weight: 100 600;
+  font-display: swap;
+  unicode-range: U+0C80-0CFF, U+200C-200D;
+}
+@font-face {
+  font-family: "Kannada";
+  src: url("/fonts/kannada-700.woff2") format("woff2");
+  font-weight: 601 900;
+  font-display: swap;
+  unicode-range: U+0C80-0CFF, U+200C-200D;
+}
+
+html,
+body,
+input,
+select,
+textarea,
+button {
+  font-family: "Manrope", "Rupee", "Kannada", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* =============================================================
+   Base — sized for a phone in daylight and a dim old monitor.
+   ============================================================= */
 html {
   font-size: 17px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  @apply bg-stone-50 text-stone-900;
+  @apply bg-paper text-ink;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Every interactive control gets a comfortable tap target. */
-.btn {
-  @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5 font-semibold no-underline;
+/* Money and quantities line up in columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
+
+/* =============================================================
+   Controls — every tap target is at least 48px.
+   Motion is transform/opacity only, and never for its own sake.
+   ============================================================= */
+.btn {
+  @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-5 font-bold no-underline;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+.btn:active {
+  transform: scale(0.975);
+}
+.btn:focus-visible {
+  @apply outline-none ring-4 ring-accent/30;
+}
+
 .btn-primary {
-  @apply btn bg-accent text-white text-lg shadow-sm active:bg-accent-dark;
+  @apply btn bg-accent text-white text-lg;
+  box-shadow: 0 1px 2px rgba(6, 46, 43, 0.16), 0 6px 16px -6px rgba(6, 46, 43, 0.4);
+}
+.btn-primary:active {
+  @apply bg-accent-dark;
 }
 .btn-secondary {
-  @apply btn border-2 border-stone-300 bg-white text-stone-800 active:bg-stone-100;
+  @apply btn border-2 border-line bg-white text-ink;
+}
+.btn-secondary:active {
+  @apply bg-paper;
 }
 .btn-danger {
-  @apply btn border-2 border-red-200 bg-white text-red-700 active:bg-red-50;
+  @apply btn border-2 border-red-200 bg-white text-red-700;
+}
+.btn-danger:active {
+  @apply bg-red-50;
+}
+.btn-ghost {
+  @apply btn text-accent-dark;
 }
 
 .field {
-  @apply block w-full min-h-[48px] rounded-xl border-2 border-stone-300 bg-white px-3 py-2 text-base focus:border-accent focus:outline-none;
+  @apply block w-full min-h-[48px] rounded-2xl border-2 border-line bg-white px-3.5 py-2 text-base text-ink;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
-.label {
-  @apply mb-1 block font-medium text-stone-700;
+.field:focus {
+  @apply border-accent outline-none;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+}
+.field::placeholder {
+  @apply text-stone-400;
 }
 
-/* ---------- print ---------- */
+.label {
+  @apply mb-1.5 block text-[0.95rem] font-semibold text-stone-600;
+}
+
+/* The eyebrow above a section: small, spaced, quiet. */
+.eyebrow {
+  @apply text-[0.7rem] font-extrabold uppercase tracking-[0.12em] text-stone-500;
+}
+
+.card {
+  @apply rounded-2xl border border-line/70 bg-white;
+  box-shadow: 0 1px 2px rgba(28, 25, 23, 0.05), 0 8px 20px -16px rgba(28, 25, 23, 0.3);
+}
+a.card,
+button.card {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+a.card:active,
+button.card:active {
+  transform: scale(0.99);
+  @apply bg-paper;
+}
+
+/* The dark band at the top of Home — the app's one moment of depth. */
+.hero {
+  background: linear-gradient(155deg, #115e59 0%, #0f766e 55%, #12796f 100%);
+}
+
+/* A quiet page-load settle. Disabled for anyone who asks for less motion,
+   and it costs the old PC nothing — one composited fade per page. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 240ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* =============================================================
+   Print — the bill only. No app furniture, no colour tricks.
+   ============================================================= */
 @media print {
   body {
     background: white !important;
@@ -44,9 +197,13 @@ body {
   .print-page {
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     max-width: none !important;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
   }
   @page {
     size: A4;

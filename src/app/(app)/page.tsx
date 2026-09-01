@@ -15,9 +15,9 @@ export default async function HomePage({
   const t = getDict();
   const supabase = supabaseServer();
   const q = (searchParams.q ?? "").trim();
-  const type = searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
+  const type =
+    searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
 
-  // ---- documents list ----
   let query = supabase
     .from("documents")
     .select("id, type, serial_no, doc_date, site_job, status, total, clients(name)")
@@ -37,7 +37,7 @@ export default async function HomePage({
     );
   }
 
-  // ---- stat strip: current year ----
+  // ---- the year's money ----
   const year = new Date().getFullYear();
   const from = `${year}-01-01`;
   const to = `${year}-12-31`;
@@ -58,14 +58,6 @@ export default async function HomePage({
   const spent = (yearExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const profit = received - spent;
 
-  const stats = [
-    { label: t.totalInvoiced, value: invoiced },
-    { label: t.received, value: received },
-    { label: t.pending, value: pending },
-    { label: t.totalExpenses, value: spent },
-    { label: t.profit, value: profit },
-  ];
-
   const filters = [
     { label: t.all, value: "" },
     { label: t.estimates, value: "estimate" },
@@ -74,37 +66,49 @@ export default async function HomePage({
 
   return (
     <main>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t.home}</h1>
-        <Link href="/documents/new?type=estimate" className="btn-primary">
-          {t.newEstimate}
+      {/* ---------- the money, up front ---------- */}
+      <section className="hero -mx-4 -mt-4 rounded-b-[2rem] px-5 pb-6 pt-6 text-white shadow-lift">
+        <div className="flex items-baseline justify-between">
+          <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.14em] text-teal-200">
+            {t.moneyIn} · {year}
+          </p>
+          <span className="text-[0.7rem] font-bold text-teal-200">{t.appName}</span>
+        </div>
+        <p className="tnum mt-1 text-[2.6rem] font-extrabold leading-none">
+          {formatINR(received, 0)}
+        </p>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[0.7rem] font-semibold text-teal-200">{t.stillToCollect}</p>
+            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(pending, 0)}</p>
+          </div>
+          <div>
+            <p className="text-[0.7rem] font-semibold text-teal-200">{t.totalExpenses}</p>
+            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(spent, 0)}</p>
+          </div>
+          <div>
+            <p className="text-[0.7rem] font-semibold text-teal-200">{t.profit}</p>
+            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(profit, 0)}</p>
+          </div>
+        </div>
+
+        <Link
+          href="/documents/new?type=estimate"
+          className="btn mt-6 w-full bg-white text-lg text-accent-deep shadow-sm"
+        >
+          ＋ {t.newEstimate}
         </Link>
-      </div>
+      </section>
 
       {searchParams.saved && (
-        <p className="mt-3 rounded-xl bg-green-100 p-3 text-center font-semibold text-green-900">
+        <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
         </p>
       )}
 
-      {/* stat strip */}
-      <div className="mt-4 overflow-x-auto">
-        <div className="flex min-w-max gap-2">
-          {stats.map((s) => (
-            <div key={s.label} className="min-w-[7.5rem] rounded-xl bg-white p-3 shadow-sm">
-              <p className="text-xs font-medium text-stone-500">
-                {s.label} · {year}
-              </p>
-              <p className={`mt-1 font-bold ${s.value < 0 ? "text-red-700" : "text-stone-900"}`}>
-                {formatINR(s.value, 0)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* search + filter */}
-      <form method="get" className="mt-4 flex gap-2">
+      {/* ---------- search + filter ---------- */}
+      <form method="get" className="mt-6 flex gap-2">
         <input
           type="search"
           name="q"
@@ -113,17 +117,26 @@ export default async function HomePage({
           className="field flex-1"
         />
         {type && <input type="hidden" name="type" value={type} />}
-        <button type="submit" className="btn-secondary" aria-label="Search">
+        <button type="submit" className="btn-secondary px-4" aria-label="Search">
           🔍
         </button>
       </form>
+
       <div className="mt-3 flex gap-2">
         {filters.map((f) => (
           <Link
             key={f.value}
-            href={f.value ? `/?type=${f.value}${q ? `&q=${encodeURIComponent(q)}` : ""}` : q ? `/?q=${encodeURIComponent(q)}` : "/"}
+            href={
+              f.value
+                ? `/?type=${f.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`
+                : q
+                  ? `/?q=${encodeURIComponent(q)}`
+                  : "/"
+            }
             className={`btn flex-1 text-sm ${
-              type === f.value ? "bg-accent text-white" : "border-2 border-stone-300 bg-white"
+              type === f.value
+                ? "bg-accent text-white"
+                : "border-2 border-line bg-white text-stone-700"
             }`}
           >
             {f.label}
@@ -131,33 +144,37 @@ export default async function HomePage({
         ))}
       </div>
 
-      {/* documents */}
+      {/* ---------- bills ---------- */}
+      <h2 className="eyebrow mt-7">{t.recentBills}</h2>
+
       {docs.length === 0 ? (
-        <div className="mt-10 rounded-2xl bg-white p-8 text-center shadow-sm">
-          <p className="text-lg text-stone-600">{t.noDocsYet}</p>
+        <div className="card mt-3 p-8 text-center">
+          <p className="text-4xl" aria-hidden>
+            🧾
+          </p>
+          <p className="mt-3 text-lg text-stone-600">{t.noDocsYet}</p>
           <Link href="/documents/new?type=estimate" className="btn-primary mt-5">
-            {t.newEstimate}
+            ＋ {t.newEstimate}
           </Link>
         </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-3 space-y-3">
           {docs.map((d) => (
             <li key={d.id}>
-              <Link
-                href={`/documents/${d.id}`}
-                className="block rounded-2xl bg-white p-4 shadow-sm active:bg-stone-100"
-              >
+              <Link href={`/documents/${d.id}`} className="card block p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold">{d.serial_no}</span>
+                  <span className="font-extrabold">{d.serial_no}</span>
                   <StatusPill status={d.status} label={t.statusLabels[d.status]} />
                 </div>
                 <p className="mt-1 truncate text-stone-700">
                   {d.clients?.name ?? "—"}
                   {d.site_job ? ` · ${d.site_job}` : ""}
                 </p>
-                <div className="mt-1 flex items-center justify-between text-sm text-stone-500">
+                <div className="mt-1.5 flex items-center justify-between text-sm text-stone-500">
                   <span>{formatDate(d.doc_date)}</span>
-                  <span className="text-lg font-bold text-stone-900">{formatINR(Number(d.total), 0)}</span>
+                  <span className="tnum text-lg font-extrabold text-ink">
+                    {formatINR(Number(d.total), 0)}
+                  </span>
                 </div>
               </Link>
             </li>

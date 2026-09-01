@@ -14,7 +14,7 @@ export default async function ExpensesPage({
   const supabase = supabaseServer();
   const { data: expenses } = await supabase
     .from("expenses")
-    .select("id, date, category, item, vendor, amount, paid_via, clients(name)")
+    .select("id, date, category, item, vendor, amount, paid_via, receipt_path, clients(name)")
     .order("date", { ascending: false })
     .limit(300);
 
@@ -26,28 +26,31 @@ export default async function ExpensesPage({
   return (
     <main>
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t.expenses}</h1>
+        <h1 className="text-2xl font-extrabold">{t.expenses}</h1>
         <Link href="/expenses/new" className="btn-primary">
           ＋ {t.addExpense}
         </Link>
       </div>
 
       {searchParams.saved && (
-        <p className="mt-3 rounded-xl bg-green-100 p-3 text-center font-semibold text-green-900">
+        <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
         </p>
       )}
 
-      <div className="mt-4 rounded-xl bg-white p-3 shadow-sm">
-        <p className="text-xs font-medium text-stone-500">
+      <div className="card mt-4 flex items-center justify-between p-4">
+        <span className="font-semibold text-stone-600">
           {t.totalExpenses} · {year}
-        </p>
-        <p className="mt-1 text-xl font-bold">{formatINR(yearTotal, 0)}</p>
+        </span>
+        <span className="tnum text-xl font-extrabold">{formatINR(yearTotal, 0)}</span>
       </div>
 
       {(expenses ?? []).length === 0 ? (
-        <div className="mt-10 rounded-2xl bg-white p-8 text-center shadow-sm">
-          <p className="text-lg text-stone-600">{t.noExpensesYet}</p>
+        <div className="card mt-6 p-8 text-center">
+          <p className="text-4xl" aria-hidden>
+            🧾
+          </p>
+          <p className="mt-3 text-lg text-stone-600">{t.noExpensesYet}</p>
           <Link href="/expenses/new" className="btn-primary mt-5">
             ＋ {t.addExpense}
           </Link>
@@ -56,23 +59,25 @@ export default async function ExpensesPage({
         <ul className="mt-4 space-y-3">
           {(expenses ?? []).map((e) => (
             <li key={e.id}>
-              <Link
-                href={`/expenses/${e.id}/edit`}
-                className="block rounded-2xl bg-white p-4 shadow-sm active:bg-stone-100"
-              >
+              <Link href={`/expenses/${e.id}/edit`} className="card block p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold">{e.item}</span>
-                  <span className="text-lg font-bold">{formatINR(Number(e.amount), 0)}</span>
+                  <span className="min-w-0 truncate font-bold">
+                    {e.receipt_path ? "📎 " : ""}
+                    {e.item}
+                  </span>
+                  <span className="tnum shrink-0 text-lg font-extrabold">
+                    {formatINR(Number(e.amount), 0)}
+                  </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-sm text-stone-500">
-                  <span>
+                <div className="mt-1 flex items-center justify-between gap-3 text-sm text-stone-500">
+                  <span className="truncate">
                     {e.category}
                     {e.vendor ? ` · ${e.vendor}` : ""}
                     {(e.clients as unknown as { name: string } | null)?.name
                       ? ` · ${(e.clients as unknown as { name: string }).name}`
                       : ""}
                   </span>
-                  <span>
+                  <span className="shrink-0">
                     {formatDate(e.date)} · {e.paid_via}
                   </span>
                 </div>

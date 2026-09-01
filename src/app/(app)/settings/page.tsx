@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { logout, saveProfile, setLanguage } from "@/lib/actions";
 import { getDict, getLang } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
+import { STATES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,29 +14,44 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
 
   return (
     <main>
-      <h1 className="text-2xl font-bold">{t.settings}</h1>
+      <h1 className="text-2xl font-extrabold">{t.settings}</h1>
 
       {searchParams.saved && (
-        <p className="mt-3 rounded-xl bg-green-100 p-3 text-center font-semibold text-green-900">
+        <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
         </p>
       )}
 
+      {/* shortcuts */}
+      <Link href="/rate-card" className="card mt-5 flex items-center justify-between p-4">
+        <span>
+          <span className="block font-extrabold">{t.rateCard}</span>
+          <span className="text-sm text-stone-500">{t.rateCardHint}</span>
+        </span>
+        <span aria-hidden className="text-2xl text-stone-400">
+          ›
+        </span>
+      </Link>
+
       {/* language */}
-      <section className="mt-5 rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="font-bold">{t.language}</h2>
+      <section className="card mt-4 p-4">
+        <h2 className="font-extrabold">{t.language}</h2>
         <form action={setLanguage} className="mt-3 flex gap-2">
           <button
             name="lang"
             value="en"
-            className={`btn flex-1 ${lang === "en" ? "bg-accent text-white" : "border-2 border-stone-300 bg-white"}`}
+            className={`btn flex-1 ${
+              lang === "en" ? "bg-accent text-white" : "border-2 border-line bg-white"
+            }`}
           >
             English
           </button>
           <button
             name="lang"
             value="kn"
-            className={`btn flex-1 ${lang === "kn" ? "bg-accent text-white" : "border-2 border-stone-300 bg-white"}`}
+            className={`btn flex-1 ${
+              lang === "kn" ? "bg-accent text-white" : "border-2 border-line bg-white"
+            }`}
           >
             ಕನ್ನಡ
           </button>
@@ -42,43 +59,99 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
       </section>
 
       {/* business profile */}
-      <form action={saveProfile} className="mt-5 space-y-5">
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-bold">{t.businessDetails}</h2>
+      <form action={saveProfile} className="mt-4 space-y-4">
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.businessDetails}</h2>
           <div className="mt-3 space-y-4">
             <div>
-              <label className="label" htmlFor="business_name">{t.businessName}</label>
-              <input id="business_name" name="business_name" defaultValue={p?.business_name ?? ""} className="field" />
+              <label className="label" htmlFor="business_name">
+                {t.businessName}
+              </label>
+              <input
+                id="business_name"
+                name="business_name"
+                defaultValue={p?.business_name ?? ""}
+                className="field"
+              />
             </div>
             <div>
-              <label className="label" htmlFor="proprietor_name">{t.proprietorName}</label>
-              <input id="proprietor_name" name="proprietor_name" defaultValue={p?.proprietor_name ?? ""} className="field" />
+              <label className="label" htmlFor="proprietor_name">
+                {t.proprietorName}
+              </label>
+              <input
+                id="proprietor_name"
+                name="proprietor_name"
+                defaultValue={p?.proprietor_name ?? ""}
+                className="field"
+              />
             </div>
             <div>
-              <label className="label" htmlFor="address">{t.address}</label>
+              <label className="label" htmlFor="address">
+                {t.address}
+              </label>
               <input id="address" name="address" defaultValue={p?.address ?? ""} className="field" />
             </div>
             <div>
-              <label className="label" htmlFor="city_pin">{t.cityPin}</label>
-              <input id="city_pin" name="city_pin" defaultValue={p?.city_pin ?? ""} className="field" />
+              <label className="label" htmlFor="city_pin">
+                {t.cityPin}
+              </label>
+              <input
+                id="city_pin"
+                name="city_pin"
+                defaultValue={p?.city_pin ?? ""}
+                className="field"
+              />
             </div>
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="label" htmlFor="phone">{t.phone}</label>
-                <input id="phone" name="phone" inputMode="tel" defaultValue={p?.phone ?? ""} className="field" />
+                <label className="label" htmlFor="phone">
+                  {t.phone}
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  inputMode="tel"
+                  defaultValue={p?.phone ?? ""}
+                  className="field"
+                />
               </div>
               <div className="flex-1">
-                <label className="label" htmlFor="email">{t.email}</label>
-                <input id="email" name="email" type="email" defaultValue={p?.email ?? ""} className="field" />
+                <label className="label" htmlFor="email">
+                  {t.email}
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={p?.email ?? ""}
+                  className="field"
+                />
               </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="state_code">
+                {t.yourState}
+              </label>
+              <select
+                id="state_code"
+                name="state_code"
+                defaultValue={p?.state_code ?? "29"}
+                className="field"
+              >
+                {STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-bold">{t.gstSection}</h2>
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.gstSection}</h2>
           <div className="mt-3 space-y-4">
-            <label className="flex min-h-[48px] items-center gap-3 font-medium">
+            <label className="flex min-h-[48px] items-center gap-3 font-semibold">
               <input
                 type="checkbox"
                 name="gst_enabled"
@@ -89,51 +162,117 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
             </label>
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="label" htmlFor="gstin">{t.gstin}</label>
+                <label className="label" htmlFor="gstin">
+                  {t.gstin}
+                </label>
                 <input id="gstin" name="gstin" defaultValue={p?.gstin ?? ""} className="field" />
               </div>
-              <div className="w-40">
-                <label className="label" htmlFor="gst_rate">{t.gstRate}</label>
-                <input id="gst_rate" name="gst_rate" inputMode="decimal" defaultValue={String(p?.gst_rate ?? 0.18)} className="field" />
+              <div className="w-36">
+                <label className="label" htmlFor="gst_rate">
+                  {t.gstRate}
+                </label>
+                <input
+                  id="gst_rate"
+                  name="gst_rate"
+                  inputMode="decimal"
+                  defaultValue={String(p?.gst_rate ?? 0.18)}
+                  className="field tnum"
+                />
               </div>
+            </div>
+            <div>
+              <label className="label" htmlFor="default_hsn_sac">
+                {t.defaultHsn}
+              </label>
+              <input
+                id="default_hsn_sac"
+                name="default_hsn_sac"
+                inputMode="numeric"
+                placeholder="995461"
+                defaultValue={p?.default_hsn_sac ?? ""}
+                className="field"
+              />
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-bold">{t.bankSection}</h2>
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.bankSection}</h2>
           <div className="mt-3 space-y-4">
             <div>
-              <label className="label" htmlFor="bank_name">{t.bankName}</label>
-              <input id="bank_name" name="bank_name" defaultValue={p?.bank_name ?? ""} className="field" />
+              <label className="label" htmlFor="bank_name">
+                {t.bankName}
+              </label>
+              <input
+                id="bank_name"
+                name="bank_name"
+                defaultValue={p?.bank_name ?? ""}
+                className="field"
+              />
             </div>
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="label" htmlFor="account_no">{t.accountNo}</label>
-                <input id="account_no" name="account_no" defaultValue={p?.account_no ?? ""} className="field" />
+                <label className="label" htmlFor="account_no">
+                  {t.accountNo}
+                </label>
+                <input
+                  id="account_no"
+                  name="account_no"
+                  defaultValue={p?.account_no ?? ""}
+                  className="field"
+                />
               </div>
               <div className="w-40">
-                <label className="label" htmlFor="ifsc">{t.ifsc}</label>
+                <label className="label" htmlFor="ifsc">
+                  {t.ifsc}
+                </label>
                 <input id="ifsc" name="ifsc" defaultValue={p?.ifsc ?? ""} className="field" />
               </div>
             </div>
             <div>
-              <label className="label" htmlFor="upi_id">{t.upiId}</label>
-              <input id="upi_id" name="upi_id" defaultValue={p?.upi_id ?? ""} className="field" />
+              <label className="label" htmlFor="upi_id">
+                {t.upiId}
+              </label>
+              <input
+                id="upi_id"
+                name="upi_id"
+                placeholder="name@oksbi"
+                defaultValue={p?.upi_id ?? ""}
+                className="field"
+              />
+              <p className="mt-1 text-sm text-stone-500">
+                {t.scanToPay} — a QR code is printed on every invoice.
+              </p>
             </div>
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white p-4 shadow-sm">
-          <h2 className="font-bold">{t.textsSection}</h2>
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.textsSection}</h2>
           <div className="mt-3 space-y-4">
             <div>
-              <label className="label" htmlFor="payment_terms">{t.paymentTerms}</label>
-              <textarea id="payment_terms" name="payment_terms" rows={2} defaultValue={p?.payment_terms ?? ""} className="field" />
+              <label className="label" htmlFor="payment_terms">
+                {t.paymentTerms}
+              </label>
+              <textarea
+                id="payment_terms"
+                name="payment_terms"
+                rows={2}
+                defaultValue={p?.payment_terms ?? ""}
+                className="field"
+              />
             </div>
             <div>
-              <label className="label" htmlFor="estimate_validity_note">{t.validityNote}</label>
-              <textarea id="estimate_validity_note" name="estimate_validity_note" rows={2} defaultValue={p?.estimate_validity_note ?? ""} className="field" />
+              <label className="label" htmlFor="estimate_validity_note">
+                {t.validityNote}
+              </label>
+              <textarea
+                id="estimate_validity_note"
+                name="estimate_validity_note"
+                rows={2}
+                defaultValue={p?.estimate_validity_note ?? ""}
+                className="field"
+              />
             </div>
           </div>
         </section>
@@ -144,8 +283,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
       </form>
 
       {/* backup */}
-      <section className="mt-5 rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="font-bold">{t.exportSection}</h2>
+      <section className="card mt-4 p-4">
+        <h2 className="font-extrabold">{t.exportSection}</h2>
         <p className="mt-1 text-sm text-stone-500">{t.exportHint}</p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <a href="/api/export?what=documents" className="btn-secondary" download>
