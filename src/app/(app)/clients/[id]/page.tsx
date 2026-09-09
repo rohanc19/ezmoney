@@ -15,7 +15,13 @@ export default async function ClientLedgerPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { saved?: string; exists?: string; inuse?: string };
+  searchParams: {
+    saved?: string;
+    exists?: string;
+    inuse?: string;
+    bills?: string;
+    spent?: string;
+  };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
@@ -91,7 +97,23 @@ export default async function ClientLedgerPage({
       )}
       {searchParams.inuse && (
         <p className="mb-3 rounded-2xl bg-amber-50 p-3 text-center font-semibold text-amber-900">
-          {t.clientHasBills}
+          {t.clientHasBills.replace(
+            "{what}",
+            [
+              Number(searchParams.bills) > 0
+                ? Number(searchParams.bills) === 1
+                  ? t.oneBillLabel
+                  : t.nBills.replace("{n}", String(searchParams.bills))
+                : "",
+              Number(searchParams.spent) > 0
+                ? Number(searchParams.spent) === 1
+                  ? t.oneExpenseLabel
+                  : t.nExpenses.replace("{n}", String(searchParams.spent))
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" + ")
+          )}
         </p>
       )}
 

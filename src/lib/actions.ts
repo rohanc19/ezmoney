@@ -625,8 +625,10 @@ export async function deleteClient(formData: FormData) {
       .eq("user_id", user.id),
   ]);
 
+  // Say what is in the way, not just "no" — he cannot act on a refusal
+  // that does not name what is holding it.
   if ((docCount ?? 0) > 0 || (expenseCount ?? 0) > 0) {
-    redirect(`/clients/${id}?inuse=1`);
+    redirect(`/clients/${id}?inuse=1&bills=${docCount ?? 0}&spent=${expenseCount ?? 0}`);
   }
 
   const { error } = await supabase.from("clients").delete().eq("id", id).eq("user_id", user.id);
