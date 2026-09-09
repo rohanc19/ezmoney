@@ -17,6 +17,17 @@ option that is simpler for him, not the one that is more capable.
 - **Old PC is a thin client.** Server-render everything; keep first-load JS around
   96 kB. No animation libraries, no UI component libraries, no client-side data
   fetching frameworks. Check the bundle line in `next build` output before shipping.
+  Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
+  and expense forms (the three client components — DocumentForm, ScanSheet,
+  RatePicker). That is the ceiling; anything that pushes a route past ~105 kB
+  needs a reason.
+- **What actually costs him is paint, not bytes.** The machine renders in
+  software more often than not. So: no `backdrop-filter` (it re-blurs the
+  backdrop every scroll frame — it was on the nav and the total bar, and both
+  are solid now), no `transform` animations on anything that wraps a page (see
+  `.rise`), and be careful adding large soft `box-shadow`s to anything that
+  repeats per row in a long list. Fonts are fine: 26 kB for English, and
+  Kannada's 56 kB only downloads if he switches, thanks to `unicode-range`.
 - **Mobile-first.** 48px minimum tap targets, single-column forms, numeric keypads
   on amount/qty fields.
 - **His words, not software words.** "New Bill", "Final Invoice", "Save as PDF" —

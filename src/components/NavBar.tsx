@@ -52,7 +52,9 @@ export default function NavBar({
   const pathname = usePathname();
 
   return (
-    <nav className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur">
+    // Solid white, not translucent + blurred: a backdrop-filter is
+    // re-computed on every scroll frame, and his PC would do that in software.
+    <nav className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white">
       <div className="mx-auto flex max-w-3xl">
         {items.map((i) => {
           const active = i.href === "/" ? pathname === "/" : pathname.startsWith(i.href);

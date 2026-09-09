@@ -419,8 +419,10 @@ button.card:active {
   margin: 0 auto;
   max-width: 48rem;
   border: 1px solid theme(colors.line);
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(6px);
+  /* Solid, not translucent-and-blurred. A backdrop-filter has to re-blur
+     what is behind it on every scroll frame, which an old integrated GPU
+     does in software — and this bar sits over a form he scrolls constantly. */
+  background: #fff;
   border-radius: 1rem 1rem 0 0;
   box-shadow: 0 -6px 20px -12px rgba(28, 25, 23, 0.45);
 }
