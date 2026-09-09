@@ -105,6 +105,7 @@ export async function saveDocument(formData: FormData) {
           user_id: user.id,
           name,
           phone: String(formData.get("new_client_phone") ?? "").trim(),
+          email: String(formData.get("new_client_email") ?? "").trim(),
           address: String(formData.get("new_client_address") ?? "").trim(),
           state_code: code,
           state_name: stateName(code),

@@ -57,6 +57,7 @@ src/lib/actions.ts                  every server action
 src/lib/gst.ts                      tax computation (single source of truth)
 src/lib/upi.ts                      UPI intent string + server-rendered QR
 src/lib/payments.ts                 part-payment sums and the derived bill status
+src/lib/share.ts                    the mailto: body for a bill
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
@@ -120,6 +121,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **A stale price never wins.** Prices are appended, never overwritten, and
   anything older than `STALE_DAYS` is shown greyed but is barred from being
   crowned cheapest — an old low price must not send him across town.
+- **`mailto:` cannot attach a file.** The email body therefore carries the
+  numbers and never claims a PDF is attached — he saves it from the print
+  view and attaches it himself. Sending the bill from the server would need
+  either a share link or a real PDF, and the latter is what the no-PDF-library
+  rule rules out. See `src/lib/share.ts`.
 - **The printed bill is English only.** Its labels come from `docLabels` in
   `src/lib/i18n.ts`, never from `t` — the app toggles to Kannada for him, but
   the sheet goes to his client's accountant. Reaching for `t` inside the

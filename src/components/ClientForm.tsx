@@ -36,6 +36,20 @@ export default function ClientForm({
         />
       </div>
       <div>
+        <label className="label" htmlFor="email">
+          {t.clientEmail}
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          defaultValue={client?.email ?? ""}
+          className="field"
+        />
+      </div>
+      <div>
         <label className="label" htmlFor="address">
           {t.clientAddress}
         </label>

@@ -13,6 +13,7 @@ import {
 import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
 import { computeTotals } from "@/lib/gst";
 import { docLabels, getDict } from "@/lib/i18n";
+import { buildBillEmail } from "@/lib/share";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
 import { PAID_VIA, STATES, type Payment } from "@/lib/types";
@@ -40,7 +41,7 @@ export default async function DocumentViewPage({
     await Promise.all([
     supabase
       .from("documents")
-      .select("*, clients(id, name, phone, address, gstin, state_code, state_name)")
+      .select("*, clients(id, name, phone, email, address, gstin, state_code, state_name)")
       .eq("id", params.id)
       .maybeSingle(),
     supabase.from("line_items").select("*").eq("document_id", params.id).order("position"),
@@ -107,6 +108,7 @@ export default async function DocumentViewPage({
     id: string;
     name: string;
     phone: string;
+    email: string;
     address: string;
     gstin: string | null;
     state_code: string;
@@ -139,6 +141,27 @@ export default async function DocumentViewPage({
   const waText = `${title} ${doc.serial_no} — ${profile?.business_name ?? ""}\n${doc.site_job}\n${t.total}: ${formatINR(Number(doc.total))}${isInvoice && profile?.upi_id ? `\nUPI: ${profile.upi_id}` : ""}`;
   const wa = client?.phone ? waLink(client.phone, waText) : null;
 
+  // mailto: cannot attach the PDF, so the body carries the numbers and he
+  // attaches the file he saved from the print view.
+  const mail = client?.email
+    ? buildBillEmail({
+        type: isInvoice ? "invoice" : "estimate",
+        serial: doc.serial_no,
+        date: formatDate(doc.doc_date),
+        siteJob: doc.site_job,
+        total: formatINR(Number(doc.total)),
+        received: isInvoice && received > 0 ? formatINR(received) : undefined,
+        balance: isInvoice && received > 0 ? formatINR(balance) : undefined,
+        clientName: client.name,
+        clientEmail: client.email,
+        businessName: profile?.business_name ?? "",
+        proprietorName: profile?.proprietor_name ?? "",
+        phone: profile?.phone ?? "",
+        upiId: profile?.upi_id ?? "",
+        terms: (isInvoice ? profile?.payment_terms : profile?.estimate_validity_note) ?? "",
+      })
+    : null;
+
   return (
     <main>
       {/* ---------- app controls (hidden in print) ---------- */}
@@ -156,14 +179,28 @@ export default async function DocumentViewPage({
           </p>
         )}
 
-        <div className="mb-4 flex gap-2">
+        <div className="mb-2 flex flex-wrap gap-2">
           <PrintButton label={t.saveAsPdf} />
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary flex-1">
               {t.sendOnWhatsApp}
             </a>
           )}
+          {mail && (
+            <a href={mail.href} className="btn-secondary flex-1">
+              {t.sendByEmail}
+            </a>
+          )}
         </div>
+
+        {mail && <p className="mb-4 text-sm text-stone-500">{t.attachPdfHint}</p>}
+        {!mail && client && (
+          <p className="mb-4 text-sm text-stone-500">
+            <Link href={`/clients/${client.id}/edit`} className="font-semibold text-accent underline">
+              {t.addClientEmail}
+            </Link>
+          </p>
+        )}
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Link href={`/documents/${doc.id}/edit`} className="btn-secondary">

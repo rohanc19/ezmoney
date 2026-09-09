@@ -82,7 +82,13 @@ export default function DocumentForm({
   const [scMode, setScMode] = useState(initial.service_charge_mode);
   const [scValue, setScValue] = useState(initial.service_charge_value);
   const [scLabel, setScLabel] = useState(initial.service_charge_label);
-  const [newClient, setNewClient] = useState({ name: "", phone: "", address: "", state: "29" });
+  const [newClient, setNewClient] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    state: "29",
+  });
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const loaded = useRef(false);
@@ -259,6 +265,15 @@ export default function DocumentForm({
               onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
               placeholder={t.clientPhone}
               inputMode="tel"
+              className="field"
+            />
+            <input
+              name="new_client_email"
+              type="email"
+              value={newClient.email}
+              onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
+              placeholder={t.clientEmail}
+              inputMode="email"
               className="field"
             />
             <input
