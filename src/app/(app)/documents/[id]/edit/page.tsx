@@ -18,7 +18,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
   ]);
   if (!doc) notFound();
 
-  const { clients, profile, rateCard, recentDescriptions, priceHints } = formData;
+  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates } = formData;
 
   return (
     <main>
@@ -60,6 +60,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
         priceHints={priceHints}
+        ownRates={ownRates}
         t={t}
       />
     </main>

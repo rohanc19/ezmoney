@@ -257,7 +257,7 @@ export default async function HomePage({
 
       {/* ---------- how the month is going ---------- */}
       {!show && !q && (thisMonth > 0 || lastMonth > 0) && (
-        <div className="card mt-4 flex items-center justify-between gap-3 p-4">
+        <Link href="/summary" className="card mt-4 flex items-center justify-between gap-3 p-4">
           <span>
             <span className="block text-xs font-semibold text-stone-500">{t.thisMonth}</span>
             <span className="tnum text-xl font-extrabold">{formatINR(thisMonth, 0)}</span>
@@ -273,8 +273,11 @@ export default async function HomePage({
                 </span>
               )}
             </span>
+            <span className="mt-0.5 block text-xs font-semibold text-accent">
+              {t.seeTheYear} →
+            </span>
           </span>
-        </div>
+        </Link>
       )}
 
       {/* ---------- search + filter ---------- */}

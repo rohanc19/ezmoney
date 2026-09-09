@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import RatePicker from "@/components/RatePicker";
 import ScanSheet from "@/components/ScanSheet";
-import { formatINR } from "@/lib/format";
+import { formatDate, formatINR } from "@/lib/format";
 import type { Dict } from "@/lib/i18n";
 import { matchesQuery } from "@/lib/prices";
+import type { OwnRate } from "@/lib/queries";
 import {
   STATES,
   UNITS,
@@ -44,6 +45,7 @@ interface Props {
   defaultHsn: string;
   recentDescriptions: string[];
   priceHints: PriceHint[];
+  ownRates: OwnRate[];
   t: Dict;
 }
 
@@ -68,6 +70,7 @@ export default function DocumentForm({
   defaultHsn,
   recentDescriptions,
   priceHints,
+  ownRates,
   t,
 }: Props) {
   const draftKey = `ezmoney-draft-${id ?? "new-" + type}`;
@@ -156,6 +159,13 @@ export default function DocumentForm({
   const findHint = (text: string): PriceHint | null => {
     if (text.trim().length < 3) return null;
     return priceHints.find((h) => matchesQuery(h.key, text)) ?? null;
+  };
+
+  // What he charged for this last time — the number he is about to
+  // decide again, with the previous one beside it if it has moved.
+  const findOwnRate = (text: string): OwnRate | null => {
+    if (text.trim().length < 3) return null;
+    return ownRates.find((r) => matchesQuery(r.key, text)) ?? null;
   };
 
   const itemsJson = JSON.stringify(
@@ -354,6 +364,25 @@ export default function DocumentForm({
                 list="recent-descriptions"
                 className="field"
               />
+              {(() => {
+                const own = findOwnRate(item.description);
+                if (!own) return null;
+                return (
+                  <p className="mt-1.5 text-xs leading-snug text-stone-600">
+                    <span className="font-semibold">{t.youChargedLast}</span>{" "}
+                    <span className="tnum font-bold">{formatINR(own.latest.rate, 0)}</span>{" "}
+                    {t.lastTimeOn} {formatDate(own.latest.date)}
+                    {own.earlier && (
+                      <>
+                        {" · "}
+                        {t.wasEarlier}{" "}
+                        <span className="tnum">{formatINR(own.earlier.rate, 0)}</span>{" "}
+                        {formatDate(own.earlier.date)}
+                      </>
+                    )}
+                  </p>
+                );
+              })()}
               {(() => {
                 const hint = findHint(item.description);
                 if (!hint || hint.quotes.length === 0) return null;

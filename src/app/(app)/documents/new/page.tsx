@@ -13,7 +13,7 @@ export default async function NewDocumentPage({
 }) {
   const t = getDict();
   const type = searchParams.type === "invoice" ? "invoice" : "estimate";
-  const { clients, profile, rateCard, recentDescriptions, priceHints, today } = await getFormData();
+  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates, today } = await getFormData();
 
   // Start a new bill with his usual service charge already filled in.
   const usualPercent = Number(profile?.default_service_charge_percent ?? 0);
@@ -49,6 +49,7 @@ export default async function NewDocumentPage({
         defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
         priceHints={priceHints}
+        ownRates={ownRates}
         t={t}
       />
     </main>

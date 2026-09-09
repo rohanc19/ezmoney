@@ -1,6 +1,6 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/format";
-import { isStale, latestPerShop, type PriceRow } from "@/lib/prices";
+import { isStale, itemKey, latestPerShop, type PriceRow } from "@/lib/prices";
 import type { BusinessProfile, PriceHint, RateCardItem } from "@/lib/types";
 
 /**
@@ -52,6 +52,55 @@ export async function getPriceHints(limit = 120): Promise<PriceHint[]> {
     .slice(0, limit);
 }
 
+export interface OwnRate {
+  key: string;
+  item: string;
+  latest: { rate: number; date: string };
+  /** The most recent *different* rate, so drift is visible at a glance. */
+  earlier?: { rate: number; date: string };
+}
+
+/**
+ * What he has charged for each thing, and what he charged before that.
+ *
+ * This is the selling side of the hint under the bill form — the shop
+ * prices are the buying side. Contractors quietly undercharge for years
+ * because nothing ever tells them their own rate stood still, so the
+ * previous different rate is shown next to the current one.
+ */
+export async function getOwnRates(limit = 150): Promise<OwnRate[]> {
+  const supabase = supabaseServer();
+  const { data } = await supabase
+    .from("line_items")
+    .select("description, rate, documents!inner(doc_date, type)")
+    .eq("documents.type", "invoice")
+    .limit(800);
+
+  type Row = { description: string; rate: number; documents: { doc_date: string } | null };
+  const byKey = new Map<string, { item: string; points: { rate: number; date: string }[] }>();
+  for (const r of (data ?? []) as unknown as Row[]) {
+    const item = (r.description ?? "").trim();
+    const date = r.documents?.doc_date;
+    const rate = Number(r.rate);
+    if (!item || !date || !(rate > 0)) continue;
+    const key = itemKey(item);
+    const row = byKey.get(key) ?? { item, points: [] };
+    row.points.push({ rate, date });
+    byKey.set(key, row);
+  }
+
+  const out: OwnRate[] = [];
+  for (const [key, row] of byKey) {
+    row.points.sort((a, b) => b.date.localeCompare(a.date));
+    const latest = row.points[0];
+    // Walk back to the first time he charged something else for it.
+    const earlier = row.points.find((p) => Math.abs(p.rate - latest.rate) > 0.005);
+    out.push({ key, item: row.item, latest, ...(earlier ? { earlier } : {}) });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 export async function getFormData() {
   const supabase = supabaseServer();
   const [
@@ -60,6 +109,7 @@ export async function getFormData() {
     { data: rateCard },
     { data: recentItems },
     priceHints,
+    ownRates,
   ] = await Promise.all([
       supabase.from("clients").select("id, name").order("name"),
       supabase.from("business_profile").select("*").maybeSingle(),
@@ -71,6 +121,7 @@ export async function getFormData() {
         .limit(200),
       supabase.from("line_items").select("description").order("id", { ascending: false }).limit(100),
       getPriceHints(),
+      getOwnRates(),
     ]);
 
   const seen = new Set<string>();
@@ -90,6 +141,7 @@ export async function getFormData() {
     rateCard: (rateCard as RateCardItem[] | null) ?? [],
     recentDescriptions,
     priceHints,
+    ownRates,
     today: todayISO(),
   };
 }

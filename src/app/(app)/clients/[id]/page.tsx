@@ -5,6 +5,7 @@ import StatusPill from "@/components/StatusPill";
 import { deleteClient } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
 import { formatDate, formatINR } from "@/lib/format";
+import { averageDaysToPay, type SummaryPayment } from "@/lib/summary";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,27 @@ export default async function ClientLedgerPage({
   if (!client) notFound();
 
   const invoices = (docs ?? []).filter((d) => d.type === "invoice");
+
+  // How long they actually take to settle — the number that decides
+  // whether to ask this one for an advance next time.
+  const { data: paymentsRaw } = invoices.length
+    ? await supabase
+        .from("payments")
+        .select("document_id, paid_on, amount")
+        .in(
+          "document_id",
+          invoices.map((d) => d.id)
+        )
+    : { data: [] };
+  const daysToPay = averageDaysToPay(
+    invoices.map((d) => ({
+      id: d.id,
+      doc_date: d.doc_date,
+      total: Number(d.total),
+      client_id: params.id,
+    })),
+    (paymentsRaw ?? []) as SummaryPayment[]
+  );
   const billed = invoices.reduce((s, d) => s + Number(d.total), 0);
   const received = invoices.reduce((s, d) => s + Number(d.amount_received), 0);
   const outstanding = billed - received;
@@ -79,6 +101,13 @@ export default async function ClientLedgerPage({
         {client.phone && <p className="text-stone-700">{client.phone}</p>}
         {client.gstin && <p className="text-sm text-stone-600">GSTIN: {client.gstin}</p>}
         {client.state_name && <p className="text-sm text-stone-500">{client.state_name}</p>}
+        <p className="mt-2 text-sm font-semibold text-stone-600">
+          {invoices.length === 1 ? t.oneJob : t.jobsCount.replace("{n}", String(invoices.length))}
+          {" · "}
+          {daysToPay === null
+            ? t.noPaymentsYetShort
+            : t.paysInDays.replace("{n}", String(daysToPay))}
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/clients/${client.id}/edit`} className="btn-secondary">
             {t.edit}

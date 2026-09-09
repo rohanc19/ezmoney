@@ -71,12 +71,13 @@ src/lib/upi.ts                      UPI intent string + server-rendered QR
 src/lib/payments.ts                 part-payment sums and the derived bill status
 src/lib/share.ts                    the mailto: body for a bill
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
+src/lib/summary.ts                  days-to-settle, job-size buckets, month series
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
 src/lib/format.ts                   ₹, Indian grouping, dd-mmm-yyyy, amount in words
 src/lib/i18n.ts                     English + Kannada labels
 src/app/(app)/...                   home, documents, clients, labour, shops, expenses,
-                                    settings, rate-card
+                                    summary, settings, rate-card
 src/app/api/scan/route.ts           OCR endpoint
 src/app/api/export/route.ts         CSV backup
 public/brand/                       CE logo files
@@ -135,6 +136,12 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   normalises and *sorts* the words into `item_prices.item_key`. Every match —
   search, and the hint under the bill form — goes through `matchesQuery`.
   Change the normalising and you must backfill `item_key` for every row.
+- **A bill is settled by the instalment that finally covers it.** Not the
+  first one — an advance on day 1 and the balance on day 60 is a sixty-day
+  customer. `daysToSettle` returns null while anything is still owed, so a
+  half-paid invoice never flatters "pays in about N days".
+- **Charts are inline SVG, never a library.** The month bars on `/summary`
+  are twelve `<rect>`s, server-rendered, zero JavaScript.
 - **A stale price never wins.** Prices are appended, never overwritten, and
   anything older than `STALE_DAYS` is shown greyed but is barred from being
   crowned cheapest — an old low price must not send him across town.

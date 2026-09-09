@@ -50,6 +50,16 @@ export default async function SettingsPage({
         </span>
       </Link>
 
+      <Link href="/summary" className="card mt-3 flex items-center justify-between gap-3 p-4">
+        <span className="min-w-0">
+          <span className="block font-extrabold">{t.summary}</span>
+          <span className="block text-sm text-stone-500">{t.summaryHint}</span>
+        </span>
+        <span aria-hidden className="shrink-0 text-2xl text-stone-400">
+          ›
+        </span>
+      </Link>
+
       <Link href="/shops" className="card mt-3 flex items-center justify-between gap-3 p-4">
         <span className="min-w-0">
           <span className="block font-extrabold">{t.priceBook}</span>
