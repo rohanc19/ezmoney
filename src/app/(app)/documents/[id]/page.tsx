@@ -187,13 +187,27 @@ export default async function DocumentViewPage({
             </a>
           )}
           {mail && (
-            <a href={mail.href} className="btn-secondary flex-1">
+            <a
+              href={mail.gmailHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary flex-1"
+            >
               {t.sendByEmail}
             </a>
           )}
         </div>
 
-        {mail && <p className="mb-4 text-sm text-stone-500">{t.attachPdfHint}</p>}
+        {mail && (
+          <p className="mb-4 text-sm text-stone-500">
+            {t.attachPdfHint}{" "}
+            {/* mailto: is the fallback, not the default — it does nothing at
+                all on a machine with no mail app registered. */}
+            <a href={mail.href} className="font-semibold text-accent underline">
+              {t.otherMailApp}
+            </a>
+          </p>
+        )}
         {!mail && client && (
           <p className="mb-4 text-sm text-stone-500">
             <Link href={`/clients/${client.id}/edit`} className="font-semibold text-accent underline">

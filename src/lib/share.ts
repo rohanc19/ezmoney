@@ -28,7 +28,10 @@ export interface BillEmailInput {
 export interface BillEmail {
   subject: string;
   body: string;
+  /** mailto: — needs a mail app registered with the browser. */
   href: string;
+  /** Gmail's own compose window — needs only a browser. */
+  gmailHref: string;
 }
 
 export function buildBillEmail(b: BillEmailInput): BillEmail {
@@ -79,5 +82,15 @@ export function buildBillEmail(b: BillEmailInput): BillEmail {
     `?subject=${encodeURIComponent(subject)}` +
     `&body=${encodeURIComponent(body)}`;
 
-  return { subject, body, href };
+  // A mailto: link does nothing at all when the browser has no mail app
+  // registered — silently, with no error — which is the normal state of a
+  // desktop Chrome that has never had Mail set up. Gmail's compose URL
+  // needs only a browser, and on his phone the Gmail app answers it.
+  const gmailHref =
+    `https://mail.google.com/mail/?view=cm&fs=1` +
+    `&to=${encodeURIComponent(b.clientEmail)}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  return { subject, body, href, gmailHref };
 }
