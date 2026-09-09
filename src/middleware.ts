@@ -48,6 +48,13 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+// Everything except static files. The old matcher let font and image
+// requests through to the auth check, which cost a round-trip to Supabase
+// per file when logged in — and, worse, redirected them to /login when
+// logged out, so the login screen rendered without Manrope and without the
+// ₹ fallback font, drawing the exact tofu box that font exists to prevent.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.json).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|fonts/|brand/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|woff2?|ttf)$).*)",
+  ],
 };

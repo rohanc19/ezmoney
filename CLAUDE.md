@@ -127,6 +127,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **`business_profile.logo_url` is a path into `public/brand`**, chosen from
   `LOGO_OPTIONS`. A file whose name contains "lockup" already includes the
   business name, so the header suppresses the text name for those.
+- **The middleware matcher must exclude static files.** Anything it matches
+  gets an `auth.getUser()` round-trip to Singapore, and a redirect to /login
+  when logged out — which once meant the login screen fetched its fonts and
+  got HTML back, drawing the very tofu box `rupee-*.woff2` exists to prevent.
+  Adding a new folder under `public/` means adding it to the matcher.
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.
