@@ -25,17 +25,28 @@ export default async function HomePage({
     .order("created_at", { ascending: false })
     .limit(200);
   if (type) query = query.eq("type", type);
-  const { data: docsRaw } = await query;
-  let docs = (docsRaw ?? []) as unknown as DocumentRow[];
+
+  // Search runs in the database, across every bill he has ever made.
+  // Filtering the last 200 in JavaScript looked fine and quietly returned
+  // "no bills" for anything older than that.
   if (q) {
-    const needle = q.toLowerCase();
-    docs = docs.filter(
-      (d) =>
-        d.serial_no.toLowerCase().includes(needle) ||
-        d.site_job.toLowerCase().includes(needle) ||
-        (d.clients?.name ?? "").toLowerCase().includes(needle)
-    );
+    // These characters are the filter language's own punctuation.
+    const safe = q.replace(/[,()*\\%]/g, " ").trim();
+    if (safe) {
+      const { data: matchedClients } = await supabase
+        .from("clients")
+        .select("id")
+        .ilike("name", `%${safe}%`);
+      const clientIds = (matchedClients ?? []).map((c) => c.id);
+
+      const parts = [`serial_no.ilike.*${safe}*`, `site_job.ilike.*${safe}*`];
+      if (clientIds.length > 0) parts.push(`client_id.in.(${clientIds.join(",")})`);
+      query = query.or(parts.join(","));
+    }
   }
+
+  const { data: docsRaw } = await query;
+  const docs = (docsRaw ?? []) as unknown as DocumentRow[];
 
   // ---- the year's money ----
   const year = new Date().getFullYear();
@@ -44,7 +55,7 @@ export default async function HomePage({
   const [{ data: yearInvoices }, { data: yearExpenses }, { data: yearLabour }] = await Promise.all([
     supabase
       .from("documents")
-      .select("total, status")
+      .select("total, amount_received")
       .eq("type", "invoice")
       .gte("doc_date", from)
       .lte("doc_date", to),
@@ -59,9 +70,9 @@ export default async function HomePage({
       .lte("entry_date", to),
   ]);
   const invoiced = (yearInvoices ?? []).reduce((s, d) => s + Number(d.total), 0);
-  const received = (yearInvoices ?? [])
-    .filter((d) => d.status === "paid")
-    .reduce((s, d) => s + Number(d.total), 0);
+  // Part-payments count. A bill half settled puts half its money here and
+  // leaves the other half in "still to collect".
+  const received = (yearInvoices ?? []).reduce((s, d) => s + Number(d.amount_received), 0);
   const pending = invoiced - received;
   const spent =
     (yearExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0) +

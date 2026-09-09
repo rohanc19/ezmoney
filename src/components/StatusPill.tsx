@@ -5,6 +5,7 @@ const styles: Record<string, string> = {
   sent: "bg-sky-100 text-sky-900",
   approved: "bg-teal-100 text-teal-900",
   rejected: "bg-red-100 text-red-900",
+  partly_paid: "bg-amber-100 text-amber-900",
   paid: "bg-green-100 text-green-900",
 };
 

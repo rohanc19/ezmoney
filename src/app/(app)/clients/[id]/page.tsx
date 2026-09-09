@@ -21,7 +21,7 @@ export default async function ClientLedgerPage({
     supabase.from("clients").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("documents")
-      .select("id, type, serial_no, doc_date, status, total, site_job")
+      .select("id, type, serial_no, doc_date, status, total, amount_received, site_job")
       .eq("client_id", params.id)
       .order("doc_date", { ascending: false }),
     supabase
@@ -34,9 +34,7 @@ export default async function ClientLedgerPage({
 
   const invoices = (docs ?? []).filter((d) => d.type === "invoice");
   const billed = invoices.reduce((s, d) => s + Number(d.total), 0);
-  const received = invoices
-    .filter((d) => d.status === "paid")
-    .reduce((s, d) => s + Number(d.total), 0);
+  const received = invoices.reduce((s, d) => s + Number(d.amount_received), 0);
   const outstanding = billed - received;
   const spent = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
 

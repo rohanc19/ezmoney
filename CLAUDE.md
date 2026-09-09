@@ -50,11 +50,13 @@ supabase/migrations/0001_init.sql   tables, RLS, next_serial()
 supabase/migrations/0002_v2.sql     GST columns, rate card, receipts bucket
 supabase/migrations/0003_v3.sql     labour book (workers + worker_entries), service charge
 supabase/migrations/0004_v4.sql     shop price book (shops + item_prices)
+supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
 supabase/seed.sql                   demo data (attaches to first auth user)
 src/middleware.ts                   session refresh + login redirect
 src/lib/actions.ts                  every server action
 src/lib/gst.ts                      tax computation (single source of truth)
 src/lib/upi.ts                      UPI intent string + server-rendered QR
+src/lib/payments.ts                 part-payment sums and the derived bill status
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
@@ -99,6 +101,17 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   the standard-rate slab. Any place that recomputes totals — the print view
   included — has to pass `serviceCharge`, or the printed TOTAL will disagree
   with the stored one.
+- **Paid is derived, never clicked.** `payments` rows are the source of truth;
+  `documents.amount_received` is the persisted sum and `status` follows the money
+  via `derivePaymentState` in `src/lib/payments.ts`. `setDocumentStatus` refuses
+  `paid` and `partly_paid` for that reason — a bill must never read Paid with no
+  payment behind it. Anything that changes a document total has to re-sync.
+- **Every money figure counts part-payments.** Home, the clients list and the
+  client ledger all read `amount_received`, not `status = 'paid'`. A new screen
+  that filters on the status instead will quietly under-report what he is owed.
+- **The backup is only a backup if `TABLES` in `src/app/api/export/route.ts`
+  lists every table.** Adding a table to the schema without adding it there
+  silently drops it from `?what=all`, which is the one file worth keeping.
 - **`itemKey` is stored, so changing it orphans the price book.** The same
   wire is written three ways on three shops' bills, so `src/lib/prices.ts`
   normalises and *sorts* the words into `item_prices.item_key`. Every match —

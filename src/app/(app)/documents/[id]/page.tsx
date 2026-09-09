@@ -3,13 +3,19 @@ import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
 import StatusPill from "@/components/StatusPill";
-import { convertToInvoice, deleteDocument, setDocumentStatus } from "@/lib/actions";
-import { amountInWords, formatDate, formatINR, formatIndianNumber } from "@/lib/format";
+import {
+  convertToInvoice,
+  deleteDocument,
+  deletePayment,
+  recordPayment,
+  setDocumentStatus,
+} from "@/lib/actions";
+import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
 import { computeTotals } from "@/lib/gst";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
-import { STATES } from "@/lib/types";
+import { PAID_VIA, STATES, type Payment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +36,8 @@ export default async function DocumentViewPage({
   const t = getDict();
   const supabase = supabaseServer();
 
-  const [{ data: doc }, { data: items }, { data: profile }] = await Promise.all([
+  const [{ data: doc }, { data: items }, { data: profile }, { data: paymentsRaw }] =
+    await Promise.all([
     supabase
       .from("documents")
       .select("*, clients(id, name, phone, address, gstin, state_code, state_name)")
@@ -38,8 +45,18 @@ export default async function DocumentViewPage({
       .maybeSingle(),
     supabase.from("line_items").select("*").eq("document_id", params.id).order("position"),
     supabase.from("business_profile").select("*").maybeSingle(),
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("document_id", params.id)
+      .order("paid_on", { ascending: false }),
   ]);
   if (!doc) notFound();
+
+  // What has actually come in against this bill.
+  const payments = (paymentsRaw ?? []) as Payment[];
+  const received = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const balance = Math.round((Number(doc.total) - received) * 100) / 100;
 
   const isInvoice = doc.type === "invoice";
   const gstOn = (profile?.gst_enabled ?? false) && Number(doc.gst_amount) > 0;
@@ -176,11 +193,11 @@ export default async function DocumentViewPage({
               <button className="btn-secondary">{t.markSent}</button>
             </form>
           )}
-          {isInvoice && doc.status !== "paid" && (
-            <form action={setDocumentStatus}>
-              <input type="hidden" name="id" value={doc.id} />
-              <input type="hidden" name="status" value="paid" />
-              <button className="btn-secondary">{t.markPaid}</button>
+          {isInvoice && balance > 0 && (
+            <form action={recordPayment}>
+              <input type="hidden" name="document_id" value={doc.id} />
+              <input type="hidden" name="full" value="1" />
+              <button className="btn-secondary">{t.markFullyPaid}</button>
             </form>
           )}
         </div>
@@ -203,6 +220,130 @@ export default async function DocumentViewPage({
           </p>
         )}
       </div>
+
+      {/* ---------- what has come in ---------- */}
+      {isInvoice && (
+        <div className="no-print mb-6">
+          <div className="card p-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-xs font-semibold text-stone-500">{t.total}</p>
+                <p className="tnum mt-0.5 font-extrabold">{formatINR(Number(doc.total), 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-stone-500">{t.amountReceived}</p>
+                <p className="tnum mt-0.5 font-extrabold text-green-800">
+                  {formatINR(received, 0)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-stone-500">{t.balanceDue}</p>
+                <p
+                  className={`tnum mt-0.5 font-extrabold ${
+                    balance > 0 ? "text-amber-700" : "text-stone-800"
+                  }`}
+                >
+                  {formatINR(balance, 0)}
+                </p>
+              </div>
+            </div>
+
+            {balance > 0 && (
+              <details className="mt-4 border-t border-line pt-3">
+                <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
+                  ＋ {t.recordPayment}
+                </summary>
+                <form action={recordPayment} className="mt-3 space-y-4">
+                  <input type="hidden" name="document_id" value={doc.id} />
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="label" htmlFor="pay_amount">
+                        {t.amount} (₹)
+                      </label>
+                      <input
+                        id="pay_amount"
+                        name="amount"
+                        inputMode="decimal"
+                        required
+                        placeholder={String(balance)}
+                        className="field tnum"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="label" htmlFor="pay_date">
+                        {t.paymentDate}
+                      </label>
+                      <input
+                        id="pay_date"
+                        type="date"
+                        name="paid_on"
+                        defaultValue={todayISO()}
+                        className="field"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="pay_method">
+                      {t.paymentMethod}
+                    </label>
+                    <select id="pay_method" name="method" className="field">
+                      {PAID_VIA.map((m) => (
+                        <option key={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="pay_notes">
+                      {t.notes}
+                    </label>
+                    <input id="pay_notes" name="notes" className="field" />
+                  </div>
+                  <button type="submit" className="btn-primary w-full">
+                    {t.save}
+                  </button>
+                </form>
+              </details>
+            )}
+
+            {payments.length > 0 && (
+              <ul className="mt-3 divide-y divide-line border-t border-line">
+                {payments.map((p) => (
+                  <li key={p.id} className="flex items-start justify-between gap-3 py-2">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">
+                        {formatDate(p.paid_on)} · {p.method}
+                      </span>
+                      {p.notes && (
+                        <span className="block text-xs text-stone-500">{p.notes}</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="tnum block font-extrabold text-green-800">
+                        {formatINR(Number(p.amount), 0)}
+                      </span>
+                      <form action={deletePayment}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <input type="hidden" name="document_id" value={doc.id} />
+                        <ConfirmButton
+                          message={t.confirmDeletePayment}
+                          className="mt-0.5 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
+                        >
+                          ✕ {t.delete}
+                        </ConfirmButton>
+                      </form>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {payments.length === 0 && (
+              <p className="mt-3 border-t border-line pt-3 text-sm text-stone-500">
+                {t.noPaymentsYet}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ---------- the printable document ----------
            One ruled sheet. Labels here stay in English: this is the
@@ -385,6 +526,19 @@ export default async function DocumentViewPage({
               <span>{t.total}</span>
               <span className="tnum">{formatINR(Number(doc.total))}</span>
             </p>
+
+            {isInvoice && received > 0 && (
+              <>
+                <p className="doc-line">
+                  <span>{t.amountReceived}</span>
+                  <span className="tnum">− {formatINR(received)}</span>
+                </p>
+                <p className="doc-line font-extrabold">
+                  <span>{balance > 0 ? t.balanceDue : t.fullySettled}</span>
+                  <span className="tnum">{formatINR(balance)}</span>
+                </p>
+              </>
+            )}
           </div>
         </div>
 

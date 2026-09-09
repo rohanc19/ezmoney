@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { computeServiceCharge, computeTotals } from "@/lib/gst";
+import { derivePaymentState, round2, sumPayments } from "@/lib/payments";
 import { itemKey } from "@/lib/prices";
 import { supabaseServer } from "@/lib/supabase/server";
 import { STATES } from "@/lib/types";
@@ -241,6 +242,10 @@ export async function saveDocument(formData: FormData) {
     );
   }
 
+  // Editing a bill can move the total past, or back under, what has
+  // already been received.
+  await syncPaymentState(user.id, docId);
+
   revalidatePath("/");
   redirect(`/documents/${docId}?saved=1`);
 }
@@ -249,7 +254,9 @@ export async function setDocumentStatus(formData: FormData) {
   const { supabase, user } = await requireUser();
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (!["draft", "sent", "approved", "rejected", "paid"].includes(status)) return;
+  // 'paid' and 'partly_paid' are derived from the payments table, never
+  // set by hand — otherwise a bill could read Paid with no money against it.
+  if (!["draft", "sent", "approved", "rejected"].includes(status)) return;
   const { error } = await supabase
     .from("documents")
     .update({ status })
@@ -655,7 +662,7 @@ export async function saveWorkerEntry(formData: FormData) {
     site_job: String(formData.get("site_job") ?? "").trim(),
     client_id: String(formData.get("client_id") ?? "") || null,
     paid_via: kind === "work" ? "Cash" : String(formData.get("paid_via") ?? "Cash"),
-    amount: Math.round(amount * 100) / 100,
+    amount: round2(amount),
     notes: String(formData.get("notes") ?? "").trim(),
   });
   if (error) throw error;
@@ -846,4 +853,87 @@ export async function savePricesFromScan(payload: {
 
   revalidatePath("/shops");
   return { saved: rows.length, shopName };
+}
+
+
+// ---------- payments against a bill ----------
+
+/**
+ * Payments are the source of truth; the bill carries the sum so a list of
+ * two hundred bills needs one query, not two hundred. Status follows the
+ * money rather than being clicked: nothing can read "Paid" with no
+ * payment behind it.
+ */
+async function syncPaymentState(userId: string, documentId: string) {
+  const supabase = supabaseServer();
+  const [{ data: doc }, { data: pays }] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("total, status")
+      .eq("id", documentId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase.from("payments").select("amount").eq("document_id", documentId),
+  ]);
+  if (!doc) return;
+
+  const received = sumPayments(pays ?? []);
+  const state = derivePaymentState(Number(doc.total), received, doc.status as string);
+
+  await supabase
+    .from("documents")
+    .update({ amount_received: state.received, status: state.status })
+    .eq("id", documentId)
+    .eq("user_id", userId);
+}
+
+export async function recordPayment(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const document_id = String(formData.get("document_id") ?? "");
+  if (!document_id) redirect("/");
+
+  const { data: doc } = await supabase
+    .from("documents")
+    .select("total, amount_received, type")
+    .eq("id", document_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!doc) redirect("/");
+
+  // "Received in full" fills in whatever is still outstanding, so the
+  // common case is one tap and the arithmetic is never his to do.
+  const outstanding = round2(Number(doc.total) - Number(doc.amount_received));
+  const typed = Number(formData.get("amount")) || 0;
+  const amount = formData.get("full") === "1" ? outstanding : typed;
+  if (amount <= 0) redirect(`/documents/${document_id}`);
+
+  const { error } = await supabase.from("payments").insert({
+    user_id: user.id,
+    document_id,
+    paid_on: String(formData.get("paid_on") ?? "") || new Date().toISOString().slice(0, 10),
+    amount: round2(amount),
+    method: String(formData.get("method") ?? "Cash"),
+    notes: String(formData.get("notes") ?? "").trim(),
+  });
+  if (error) throw error;
+
+  await syncPaymentState(user.id, document_id);
+  revalidatePath("/");
+  redirect(`/documents/${document_id}?saved=1`);
+}
+
+export async function deletePayment(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const document_id = String(formData.get("document_id") ?? "");
+  const { error } = await supabase
+    .from("payments")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw error;
+
+  await syncPaymentState(user.id, document_id);
+  revalidatePath("/");
+  redirect(`/documents/${document_id}`);
 }

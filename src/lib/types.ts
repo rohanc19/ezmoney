@@ -1,5 +1,11 @@
 export type DocType = "estimate" | "invoice";
-export type DocStatus = "draft" | "sent" | "approved" | "rejected" | "paid";
+export type DocStatus =
+  | "draft"
+  | "sent"
+  | "approved"
+  | "rejected"
+  | "partly_paid"
+  | "paid";
 
 export const UNITS = ["Nos", "Mtr", "Ft", "Hrs", "Day", "Job", "Set", "Point", "Lump"] as const;
 export const EXPENSE_CATEGORIES = [
@@ -112,6 +118,8 @@ export interface DocumentRow {
   sgst_amount: number;
   igst_amount: number;
   place_of_supply: string;
+  /** Derived from the payments table and written back onto the bill. */
+  amount_received: number;
   service_charge_mode: ServiceChargeMode;
   service_charge_value: number;
   service_charge_amount: number;
@@ -119,6 +127,16 @@ export interface DocumentRow {
   total: number;
   notes: string;
   clients?: { name: string; phone: string; address: string } | null;
+}
+
+/** One instalment against a bill. Payments are the source of truth. */
+export interface Payment {
+  id: string;
+  document_id: string;
+  paid_on: string;
+  amount: number;
+  method: string;
+  notes: string;
 }
 
 export interface Expense {

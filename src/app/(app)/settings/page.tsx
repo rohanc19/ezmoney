@@ -369,7 +369,12 @@ export default async function SettingsPage({
       {/* backup */}
       <section className="card mt-4 p-4">
         <h2 className="font-extrabold">{t.exportSection}</h2>
-        <p className="mt-1 text-sm text-stone-500">{t.exportHint}</p>
+        <p className="mt-1 text-sm text-stone-500">{t.exportEverythingHint}</p>
+        <a href="/api/export?what=all" className="btn-primary mt-3 w-full" download>
+          {t.exportEverything}
+        </a>
+
+        <p className="mt-5 text-sm text-stone-500">{t.exportHint}</p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <a href="/api/export?what=documents" className="btn-secondary" download>
             {t.exportDocuments}
@@ -377,11 +382,20 @@ export default async function SettingsPage({
           <a href="/api/export?what=line_items" className="btn-secondary" download>
             {t.exportItems}
           </a>
+          <a href="/api/export?what=payments" className="btn-secondary" download>
+            {t.exportPayments}
+          </a>
           <a href="/api/export?what=expenses" className="btn-secondary" download>
             {t.exportExpenses}
           </a>
           <a href="/api/export?what=clients" className="btn-secondary" download>
             {t.exportClients}
+          </a>
+          <a href="/api/export?what=worker_entries" className="btn-secondary" download>
+            {t.exportWorkers}
+          </a>
+          <a href="/api/export?what=item_prices" className="btn-secondary" download>
+            {t.exportPrices}
           </a>
         </div>
       </section>

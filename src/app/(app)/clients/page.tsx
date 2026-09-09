@@ -11,7 +11,7 @@ export default async function ClientsPage() {
 
   const [{ data: clients }, { data: docs }] = await Promise.all([
     supabase.from("clients").select("id, name, phone, address").order("name"),
-    supabase.from("documents").select("client_id, type, status, total"),
+    supabase.from("documents").select("client_id, type, total, amount_received"),
   ]);
 
   // Outstanding = invoices raised for them that are not yet paid.
@@ -22,7 +22,7 @@ export default async function ClientsPage() {
     s.count += 1;
     if (d.type === "invoice") {
       s.billed += Number(d.total);
-      if (d.status !== "paid") s.outstanding += Number(d.total);
+      s.outstanding += Number(d.total) - Number(d.amount_received);
     }
     summary.set(d.client_id, s);
   }
