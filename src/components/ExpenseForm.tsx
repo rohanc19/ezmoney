@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/format";
 import { downscaleImage } from "@/lib/image";
 import type { Dict } from "@/lib/i18n";
@@ -188,7 +189,13 @@ export default function ExpenseForm({
                   disabled={scanning}
                   onClick={fillFromPhoto}
                 >
-                  {scanning ? t.scanning : `✨ ${t.scanBill}`}
+                  {scanning ? (
+                    t.scanning
+                  ) : (
+                    <>
+                      <Icon name="camera" /> {t.scanBill}
+                    </>
+                  )}
                 </button>
               )}
               <button
@@ -210,7 +217,7 @@ export default function ExpenseForm({
             className="btn-secondary w-full"
             onClick={() => fileRef.current?.click()}
           >
-            📷 {t.addPhoto}
+            <Icon name="camera" /> {t.addPhoto}
           </button>
         )}
         {scanNote && (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
-import PrintButton from "@/components/PrintButton";
+import ShareActions from "@/components/ShareActions";
 import StatusPill from "@/components/StatusPill";
 import {
   convertToInvoice,
@@ -179,30 +179,19 @@ export default async function DocumentViewPage({
           </p>
         )}
 
-        <div className="mb-2 flex flex-wrap gap-2">
-          <PrintButton label={t.saveAsPdf} />
-          {wa && (
-            <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary flex-1">
-              {t.sendOnWhatsApp}
-            </a>
-          )}
-          {mail && (
-            <a
-              href={mail.gmailHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary flex-1"
-            >
-              {t.sendByEmail}
-            </a>
-          )}
-        </div>
+        <ShareActions
+          documentId={doc.id}
+          isDraft={doc.status === "draft"}
+          pdfLabel={t.saveAsPdf}
+          waHref={wa}
+          waLabel={t.sendOnWhatsApp}
+          mailHref={mail?.gmailHref ?? null}
+          mailLabel={t.sendByEmail}
+        />
 
         {mail && (
           <p className="mb-4 text-sm text-stone-500">
             {t.attachPdfHint}{" "}
-            {/* mailto: is the fallback, not the default — it does nothing at
-                all on a machine with no mail app registered. */}
             <a href={mail.href} className="font-semibold text-accent underline">
               {t.otherMailApp}
             </a>
@@ -210,53 +199,14 @@ export default async function DocumentViewPage({
         )}
         {!mail && client && (
           <p className="mb-4 text-sm text-stone-500">
-            <Link href={`/clients/${client.id}/edit`} className="font-semibold text-accent underline">
+            <Link
+              href={`/clients/${client.id}/edit`}
+              className="font-semibold text-accent underline"
+            >
               {t.addClientEmail}
             </Link>
           </p>
         )}
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Link href={`/documents/${doc.id}/edit`} className="btn-secondary">
-            {t.edit}
-          </Link>
-
-          {!isInvoice && doc.status === "draft" && (
-            <form action={setDocumentStatus}>
-              <input type="hidden" name="id" value={doc.id} />
-              <input type="hidden" name="status" value="sent" />
-              <button className="btn-secondary">{t.markSent}</button>
-            </form>
-          )}
-          {!isInvoice && (doc.status === "draft" || doc.status === "sent") && (
-            <>
-              <form action={setDocumentStatus}>
-                <input type="hidden" name="id" value={doc.id} />
-                <input type="hidden" name="status" value="approved" />
-                <button className="btn-secondary">{t.markApproved}</button>
-              </form>
-              <form action={setDocumentStatus}>
-                <input type="hidden" name="id" value={doc.id} />
-                <input type="hidden" name="status" value="rejected" />
-                <button className="btn-secondary">{t.markRejected}</button>
-              </form>
-            </>
-          )}
-          {isInvoice && doc.status === "draft" && (
-            <form action={setDocumentStatus}>
-              <input type="hidden" name="id" value={doc.id} />
-              <input type="hidden" name="status" value="sent" />
-              <button className="btn-secondary">{t.markSent}</button>
-            </form>
-          )}
-          {isInvoice && balance > 0 && (
-            <form action={recordPayment}>
-              <input type="hidden" name="document_id" value={doc.id} />
-              <input type="hidden" name="full" value="1" />
-              <button className="btn-secondary">{t.markFullyPaid}</button>
-            </form>
-          )}
-        </div>
 
         {!isInvoice && doc.status === "approved" && !linkedInvoice && (
           <form action={convertToInvoice} className="mb-4">
@@ -264,6 +214,48 @@ export default async function DocumentViewPage({
             <button className="btn-primary w-full text-xl">→ {t.makeFinalInvoice}</button>
           </form>
         )}
+        {/* Everything he needs rarely. One primary action above; these
+            stay reachable without competing with it. */}
+        <details className="card mb-4 p-3">
+          <summary className="min-h-[44px] cursor-pointer list-none px-1 font-bold text-stone-600">
+            {t.more}
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link href={`/documents/${doc.id}/edit`} className="btn-secondary">
+              {t.edit}
+            </Link>
+
+            {doc.status === "draft" && (
+              <form action={setDocumentStatus}>
+                <input type="hidden" name="id" value={doc.id} />
+                <input type="hidden" name="status" value="sent" />
+                <button className="btn-secondary">{t.markSent}</button>
+              </form>
+            )}
+            {!isInvoice && (doc.status === "draft" || doc.status === "sent") && (
+              <>
+                <form action={setDocumentStatus}>
+                  <input type="hidden" name="id" value={doc.id} />
+                  <input type="hidden" name="status" value="approved" />
+                  <button className="btn-secondary">{t.markApproved}</button>
+                </form>
+                <form action={setDocumentStatus}>
+                  <input type="hidden" name="id" value={doc.id} />
+                  <input type="hidden" name="status" value="rejected" />
+                  <button className="btn-secondary">{t.markRejected}</button>
+                </form>
+              </>
+            )}
+
+            <form action={deleteDocument}>
+              <input type="hidden" name="id" value={doc.id} />
+              <ConfirmButton message={t.confirmDeleteDoc} className="btn-danger">
+                {t.delete}
+              </ConfirmButton>
+            </form>
+          </div>
+        </details>
+
         {linkedInvoice && (
           <p className="mb-4 rounded-2xl bg-accent-wash p-3 text-center">
             {t.finalInvoice}:{" "}
@@ -307,7 +299,7 @@ export default async function DocumentViewPage({
             {balance > 0 && (
               <details className="mt-4 border-t border-line pt-3">
                 <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-                  ＋ {t.recordPayment}
+                  + {t.recordPayment}
                 </summary>
                 <form action={recordPayment} className="mt-3 space-y-4">
                   <input type="hidden" name="document_id" value={doc.id} />
@@ -384,7 +376,7 @@ export default async function DocumentViewPage({
                           message={t.confirmDeletePayment}
                           className="mt-0.5 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                         >
-                          ✕ {t.delete}
+                          × {t.delete}
                         </ConfirmButton>
                       </form>
                     </span>
@@ -468,15 +460,21 @@ export default async function DocumentViewPage({
                 <span className="tnum">{linkedEstimateSerial}</span>
               </p>
             )}
-            <p className="doc-kv">
-              <span>Status</span>
-              <span>{docLabels.status[doc.status]}</span>
-            </p>
+            {/* A customer copy must never read "Draft". The only status
+                worth printing is that the money arrived. */}
+            {isInvoice && received > 0 && (
+              <p className="doc-kv">
+                <span />
+                <span className="text-[0.95rem] font-extrabold tracking-widest">
+                  {balance <= 0.005 ? docLabels.paid : docLabels.partPaid}
+                </span>
+              </p>
+            )}
           </div>
         </div>
 
         {/* who it is for · what the job was */}
-        <div className="doc-head">
+        <div className={doc.site_job ? "doc-head" : "doc-head doc-head-single"}>
           <div className="doc-cell">
             <p className="doc-eyebrow">Bill To</p>
             <p className="mt-1 font-extrabold">{client?.name ?? "—"}</p>
@@ -488,14 +486,39 @@ export default async function DocumentViewPage({
               <p className="text-[0.8rem] font-semibold">GSTIN: {client.gstin}</p>
             )}
           </div>
-          <div className="doc-cell">
-            <p className="doc-eyebrow">Site / Job</p>
-            <p className="mt-1 text-[0.85rem] leading-snug">{doc.site_job || "—"}</p>
-          </div>
+          {doc.site_job && (
+            <div className="doc-cell">
+              <p className="doc-eyebrow">Site / Job</p>
+              <p className="mt-1 text-[0.85rem] leading-snug">{doc.site_job}</p>
+            </div>
+          )}
         </div>
 
-        {/* the items */}
-        <div className="overflow-x-auto">
+        {/* the items — on a phone as blocks, because the table pushed the
+            amount off the right edge; on paper always the ruled table */}
+        <div className="doc-lines">
+          {(items ?? []).map((i, idx) => (
+            <div key={i.id} className="doc-line-row">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-[0.9rem] font-semibold leading-snug">
+                  {idx + 1}. {i.description}
+                </span>
+                <span className="tnum shrink-0 font-extrabold">
+                  {formatINR(Number(i.amount))}
+                </span>
+              </div>
+              <p className="tnum mt-0.5 text-[0.78rem] text-stone-600">
+                {formatIndianNumber(Number(i.qty), 0)} {i.unit} × {formatINR(Number(i.rate))}
+                {gstOn && i.hsn_sac ? ` · ${docLabels.hsn} ${i.hsn_sac}` : ""}
+              </p>
+            </div>
+          ))}
+          {(items ?? []).length === 0 && (
+            <p className="doc-line-row text-center text-stone-500">—</p>
+          )}
+        </div>
+
+        <div className="doc-table-wrap overflow-x-auto">
           <table className="doc-table">
             <thead>
               <tr>
@@ -711,12 +734,6 @@ export default async function DocumentViewPage({
         </div>
       </div>
 
-      <form action={deleteDocument} className="no-print mt-6">
-        <input type="hidden" name="id" value={doc.id} />
-        <ConfirmButton message={t.confirmDeleteDoc} className="btn-danger w-full">
-          {t.delete}
-        </ConfirmButton>
-      </form>
     </main>
   );
 }

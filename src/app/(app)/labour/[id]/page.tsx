@@ -122,7 +122,7 @@ export default async function WorkerBookPage({
       {/* ---- add a work day ---- */}
       <details className="card mt-4 p-4">
         <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-          ＋ {t.addWork}
+          + {t.addWork}
         </summary>
         <form action={saveWorkerEntry} className="mt-4 space-y-4">
           <input type="hidden" name="worker_id" value={worker.id} />
@@ -193,7 +193,7 @@ export default async function WorkerBookPage({
       {/* ---- pay money ---- */}
       <details className="card mt-3 p-4">
         <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-          ＋ {t.addPayment}
+          + {t.addPayment}
         </summary>
         <form action={saveWorkerEntry} className="mt-4 space-y-4">
           <input type="hidden" name="worker_id" value={worker.id} />
@@ -305,7 +305,7 @@ export default async function WorkerBookPage({
                         message={t.confirmDeleteEntry}
                         className="mt-1 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                       >
-                        ✕ {t.delete}
+                        × {t.delete}
                       </ConfirmButton>
                     </form>
                   </span>

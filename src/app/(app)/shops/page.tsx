@@ -57,7 +57,7 @@ export default async function ShopsPage({
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-extrabold">{t.priceBook}</h1>
         <Link href="/shops/new" className="btn-secondary">
-          ＋ {t.addShop}
+          + {t.addShop}
         </Link>
       </div>
 
@@ -143,7 +143,7 @@ export default async function ShopsPage({
         <div className="card mt-3 p-8 text-center">
           <p className="text-lg text-stone-600">{t.noShopsYet}</p>
           <Link href="/shops/new" className="btn-primary mt-5">
-            ＋ {t.addShop}
+            + {t.addShop}
           </Link>
         </div>
       ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/format";
 import type { Dict } from "@/lib/i18n";
 import type { RateCardItem } from "@/lib/types";
@@ -32,7 +33,7 @@ export default function RatePicker({
   return (
     <>
       <button type="button" className="btn-secondary w-full" onClick={() => setOpen(true)}>
-        ☰ {t.pickFromList}
+        <Icon name="list" /> {t.pickFromList}
       </button>
 
       {open && (
@@ -40,7 +41,7 @@ export default function RatePicker({
           <div className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
             <h2 className="text-lg font-extrabold">{t.rateCardShort}</h2>
             <button type="button" className="btn-ghost px-3" onClick={() => setOpen(false)}>
-              ✕ {t.cancel}
+              × {t.cancel}
             </button>
           </div>
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import { getDict } from "@/lib/i18n";
 import { formatDate, formatINR } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -43,7 +44,7 @@ export default async function ExpensesPage({
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">{t.expenses}</h1>
         <Link href="/expenses/new" className="btn-primary">
-          ＋ {t.addExpense}
+          + {t.addExpense}
         </Link>
       </div>
 
@@ -88,12 +89,9 @@ export default async function ExpensesPage({
 
       {(expenses ?? []).length === 0 ? (
         <div className="card mt-6 p-8 text-center">
-          <p className="text-4xl" aria-hidden>
-            🧾
-          </p>
           <p className="mt-3 text-lg text-stone-600">{t.noExpensesYet}</p>
           <Link href="/expenses/new" className="btn-primary mt-5">
-            ＋ {t.addExpense}
+            + {t.addExpense}
           </Link>
         </div>
       ) : (
@@ -103,7 +101,9 @@ export default async function ExpensesPage({
               <Link href={`/expenses/${e.id}/edit`} className="card block p-4">
                 <div className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate font-bold">
-                    {e.receipt_path ? "📎 " : ""}
+                    {e.receipt_path && (
+                      <Icon name="clip" className="mr-1 inline-block h-4 w-4 align-[-2px]" />
+                    )}
                     {e.item}
                   </span>
                   <span className="tnum shrink-0 text-lg font-extrabold">

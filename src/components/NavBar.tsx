@@ -61,7 +61,7 @@ export default function NavBar({
               key={i.href}
               href={i.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex min-h-[62px] flex-1 flex-col items-center justify-center gap-1 px-1 text-[0.7rem] font-bold ${
+              className={`relative flex min-h-[62px] flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-[0.64rem] font-bold leading-tight ${
                 active ? "text-accent" : "text-stone-500"
               }`}
             >
@@ -74,11 +74,11 @@ export default function NavBar({
                 strokeWidth={active ? 2.2 : 1.9}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-[22px] w-[22px]"
+                className="h-[21px] w-[21px]"
               >
                 {paths[i.icon]}
               </svg>
-              <span className="truncate">{i.label}</span>
+              <span className="w-full truncate text-center">{i.label}</span>
             </Link>
           );
         })}

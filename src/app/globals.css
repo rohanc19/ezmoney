@@ -158,15 +158,19 @@ button.card:active {
 }
 
 /* A quiet page-load settle. Disabled for anyone who asks for less motion,
-   and it costs the old PC nothing — one composited fade per page. */
+   and it costs the old PC nothing — one composited fade per page.
+ *
+ * Fades only, deliberately. This class wraps every page, and an ancestor
+ * that animates `transform` becomes the containing block for `position:
+ * fixed` descendants — which silently broke the running-total bar and
+ * left the full-screen scan and rate-card sheets positioned against the
+ * page instead of the screen. A 6px slide is not worth that. */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 .rise {
@@ -227,6 +231,13 @@ button.card:active {
   .doc-head > * + * {
     border-top: 0;
     border-left: 1px solid var(--doc-rule);
+  }
+}
+
+@media (min-width: 640px), print {
+  /* Nothing to put in the second panel — do not leave half the row blank. */
+  .doc-head-single {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -304,6 +315,33 @@ button.card:active {
   white-space: nowrap;
 }
 
+/* On a phone the ruled table pushes the Amount column off the right edge
+   — the one number the customer actually asks about — behind a scrollbar
+   nobody notices. Below 640px each line is drawn as a block instead.
+   Print and desktop keep the table, which is what a bill should look like
+   on paper. */
+.doc-lines {
+  display: block;
+}
+.doc-table-wrap {
+  display: none;
+}
+@media (min-width: 640px), print {
+  .doc-lines {
+    display: none;
+  }
+  .doc-table-wrap {
+    display: block;
+  }
+}
+.doc-line-row {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--doc-rule);
+}
+.doc-line-row:last-child {
+  border-bottom: 0;
+}
+
 /* Amount in words on the left, the money stack on the right. */
 .doc-summary {
   display: grid;
@@ -363,6 +401,28 @@ button.card:active {
   padding-top: 0.25rem;
   font-size: 0.72rem;
   color: #6b645b;
+}
+
+/* The running total, kept in view while he builds a bill with a customer
+   standing next to him. Sits directly above the nav bar. */
+.total-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 62px;
+  z-index: 30;
+  pointer-events: none;
+  padding: 0 1rem;
+}
+.total-bar-inner {
+  pointer-events: auto;
+  margin: 0 auto;
+  max-width: 48rem;
+  border: 1px solid theme(colors.line);
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(6px);
+  border-radius: 1rem 1rem 0 0;
+  box-shadow: 0 -6px 20px -12px rgba(28, 25, 23, 0.45);
 }
 
 /* =============================================================

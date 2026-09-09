@@ -80,7 +80,7 @@ export default async function ShopPage({
       {/* add a price he was quoted, without buying anything */}
       <details className="card mt-4 p-4">
         <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-          ＋ {t.addPrice}
+          + {t.addPrice}
         </summary>
         <form action={savePrice} className="mt-4 space-y-4">
           <input type="hidden" name="shop_id" value={shop.id} />
@@ -158,7 +158,7 @@ export default async function ShopPage({
                       message={t.confirmDeletePrice}
                       className="mt-1 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                     >
-                      ✕ {t.delete}
+                      × {t.delete}
                     </ConfirmButton>
                   </form>
                 </span>

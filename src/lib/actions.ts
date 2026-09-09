@@ -268,6 +268,34 @@ export async function setDocumentStatus(formData: FormData) {
   redirect(`/documents/${id}?saved=1`);
 }
 
+/**
+ * Called when he shares a bill — saves the PDF, opens WhatsApp, opens
+ * Gmail. Sending it is what makes it sent, so he never has to say so.
+ * Silent by design: it must not interrupt the share it is attached to.
+ */
+export async function markSentIfDraft(documentId: string) {
+  const { supabase, user } = await requireUser();
+  const { data: doc } = await supabase
+    .from("documents")
+    .select("status")
+    .eq("id", documentId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!doc || doc.status !== "draft") return;
+
+  const { error } = await supabase
+    .from("documents")
+    .update({ status: "sent" })
+    .eq("id", documentId)
+    .eq("user_id", user.id);
+  if (error) {
+    console.error("could not mark sent", error);
+    return;
+  }
+  revalidatePath(`/documents/${documentId}`);
+  revalidatePath("/");
+}
+
 export async function deleteDocument(formData: FormData) {
   const { supabase, user } = await requireUser();
   const id = String(formData.get("id") ?? "");
@@ -549,6 +577,19 @@ export async function saveClient(formData: FormData) {
     revalidatePath(`/clients/${id}`);
     redirect(`/clients/${id}?saved=1`);
   }
+  // "Gopinath relation" and "Gopinath Relation" were two records for one
+  // customer. A name he already uses means the same person.
+  const { data: existing } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("user_id", user.id)
+    .ilike("name", row.name)
+    .maybeSingle();
+  if (existing) {
+    revalidatePath("/clients");
+    redirect(`/clients/${existing.id}?exists=1`);
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({ user_id: user.id, ...row })
@@ -557,6 +598,41 @@ export async function saveClient(formData: FormData) {
   if (error) throw error;
   revalidatePath("/clients");
   redirect(`/clients/${data.id}?saved=1`);
+}
+
+/**
+ * Deleting a client is refused while any bill or expense still points at
+ * them. documents.client_id is `on delete set null`, so allowing it would
+ * silently strip the customer's name off invoices he has already issued —
+ * a GST document with a hole in it. Junk entries can still be cleared,
+ * which is the only case he actually needs.
+ */
+export async function deleteClient(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/clients");
+
+  const [{ count: docCount }, { count: expenseCount }] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", id)
+      .eq("user_id", user.id),
+    supabase
+      .from("expenses")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", id)
+      .eq("user_id", user.id),
+  ]);
+
+  if ((docCount ?? 0) > 0 || (expenseCount ?? 0) > 0) {
+    redirect(`/clients/${id}?inuse=1`);
+  }
+
+  const { error } = await supabase.from("clients").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/clients");
+  redirect("/clients");
 }
 
 // ---------- business profile ----------

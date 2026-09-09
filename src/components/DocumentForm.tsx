@@ -217,7 +217,7 @@ export default function DocumentForm({
           /* ignore */
         }
       }}
-      className="space-y-5 pb-4"
+      className="space-y-5 pb-20"
     >
       {id && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="type" value={type} />
@@ -419,13 +419,18 @@ export default function DocumentForm({
               )}
 
               <div className="mt-2 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                  className="min-h-[44px] rounded-xl px-3 text-sm font-semibold text-red-700 active:bg-red-50"
-                >
-                  ✕ {t.delete}
-                </button>
+                {/* Nothing to remove when this is the only line. */}
+                {items.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                    className="min-h-[44px] rounded-xl px-3 text-sm font-semibold text-red-700 active:bg-red-50"
+                  >
+                    × {t.delete}
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <span className="tnum font-bold">
                   {formatINR((Number(item.qty) || 0) * (Number(item.rate) || 0))}
                 </span>
@@ -439,7 +444,7 @@ export default function DocumentForm({
           onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn)])}
           className="btn-secondary mt-3 w-full"
         >
-          ＋ {t.addItem}
+          + {t.addItem}
         </button>
       </div>
 
@@ -522,25 +527,31 @@ export default function DocumentForm({
         </div>
       </div>
 
-      {/* status + notes */}
-      <div>
-        <label htmlFor="status" className="label">
-          {t.status}
-        </label>
-        <select
-          id="status"
-          name="status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="field"
-        >
-          {statusOptions.map((s) => (
-            <option key={s} value={s}>
-              {t.statusLabels[s]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Status is a decision he never needs when writing a bill — a new
+          one is a draft, and sharing it is what makes it sent. On an
+          existing bill it stays available. */}
+      {id ? (
+        <div>
+          <label htmlFor="status" className="label">
+            {t.status}
+          </label>
+          <select
+            id="status"
+            name="status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="field"
+          >
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {t.statusLabels[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <input type="hidden" name="status" value={status} />
+      )}
       <div>
         <label htmlFor="notes" className="label">
           {t.notes}
@@ -562,6 +573,17 @@ export default function DocumentForm({
       >
         {saving ? "…" : t.save}
       </button>
+
+      {/* He quotes with the customer standing next to him; the number he
+          is about to say out loud should never be a scroll away. */}
+      {total > 0 && (
+        <div className="total-bar no-print">
+          <div className="total-bar-inner flex items-center justify-between px-4 py-2.5">
+            <span className="font-semibold text-stone-600">{t.total}</span>
+            <span className="tnum text-xl font-extrabold">{formatINR(total)}</span>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

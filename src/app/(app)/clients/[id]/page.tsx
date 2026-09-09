@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ConfirmButton from "@/components/ConfirmButton";
 import StatusPill from "@/components/StatusPill";
+import { deleteClient } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
 import { formatDate, formatINR } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -12,7 +14,7 @@ export default async function ClientLedgerPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { saved?: string };
+  searchParams: { saved?: string; exists?: string; inuse?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
@@ -60,6 +62,16 @@ export default async function ClientLedgerPage({
           {t.saved}
         </p>
       )}
+      {searchParams.exists && (
+        <p className="mb-3 rounded-2xl bg-amber-50 p-3 text-center font-semibold text-amber-900">
+          {t.clientExists}
+        </p>
+      )}
+      {searchParams.inuse && (
+        <p className="mb-3 rounded-2xl bg-amber-50 p-3 text-center font-semibold text-amber-900">
+          {t.clientHasBills}
+        </p>
+      )}
 
       {/* who they are */}
       <div className="card p-4">
@@ -69,7 +81,7 @@ export default async function ClientLedgerPage({
         {client.state_name && <p className="text-sm text-stone-500">{client.state_name}</p>}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/clients/${client.id}/edit`} className="btn-secondary">
-            ✏️ {t.edit}
+            {t.edit}
           </Link>
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary">
@@ -151,6 +163,13 @@ export default async function ClientLedgerPage({
           </ul>
         </>
       )}
+      {/* Only possible while nothing points at them — see deleteClient. */}
+      <form action={deleteClient} className="mt-8">
+        <input type="hidden" name="id" value={client.id} />
+        <ConfirmButton message={t.confirmDeleteClient} className="btn-danger w-full">
+          {t.deleteClient}
+        </ConfirmButton>
+      </form>
     </main>
   );
 }

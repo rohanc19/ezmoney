@@ -383,7 +383,6 @@ export default async function SettingsPage({
               scanCheck.ok ? "bg-green-100 text-green-900" : "bg-amber-50 text-amber-900"
             }`}
           >
-            {scanCheck.ok ? "✓ " : ""}
             {scanCheck.message}
           </p>
         )}

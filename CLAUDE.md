@@ -126,6 +126,20 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   view and attaches it himself. Sending the bill from the server would need
   either a share link or a real PDF, and the latter is what the no-PDF-library
   rule rules out. See `src/lib/share.ts`.
+- **Never animate `transform` on an ancestor of the whole page.** `.rise`
+  wraps every screen; while it animated transform it became the containing
+  block for every `position: fixed` descendant, which silently pushed the
+  running-total bar off-screen and left the full-screen scan and rate-card
+  sheets positioned against the page instead of the viewport. It fades only.
+- **A customer copy never shows workflow status.** The printed bill prints
+  PAID or PART PAID when money has arrived, and nothing otherwise — every
+  bill he had sent read "Draft".
+- **Sharing is what marks a bill sent.** Save as PDF, WhatsApp and Gmail all
+  call `markSentIfDraft`; there is no chore to remember. Ten bills in, every
+  one of them was still a draft.
+- **The bill renders twice.** `.doc-lines` (blocks) below 640px, and
+  `.doc-table-wrap` (the ruled table) at 640px and up *and in print* — the
+  table pushed the Amount column off a phone screen behind a scrollbar.
 - **The printed bill is English only.** Its labels come from `docLabels` in
   `src/lib/i18n.ts`, never from `t` — the app toggles to Kannada for him, but
   the sheet goes to his client's accountant. Reaching for `t` inside the

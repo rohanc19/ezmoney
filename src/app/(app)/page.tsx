@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import StatusPill from "@/components/StatusPill";
 import { getDict } from "@/lib/i18n";
 import { formatDate, formatINR } from "@/lib/format";
@@ -47,6 +48,20 @@ export default async function HomePage({
 
   const { data: docsRaw } = await query;
   const docs = (docsRaw ?? []) as unknown as DocumentRow[];
+
+  // ---- is the letterhead actually filled in? ----
+  // His business email was still "example@gmail.com", and that prints on
+  // every bill that leaves the app.
+  const { data: profile } = await supabase
+    .from("business_profile")
+    .select("business_name, phone, address, email")
+    .maybeSingle();
+  const placeholderEmail = /example|yourname|test@/i.test(profile?.email ?? "");
+  const profileIncomplete =
+    !profile?.business_name?.trim() ||
+    !profile?.phone?.trim() ||
+    !profile?.address?.trim() ||
+    placeholderEmail;
 
   // ---- the year's money ----
   const year = new Date().getFullYear();
@@ -118,7 +133,7 @@ export default async function HomePage({
           href="/documents/new?type=estimate"
           className="btn mt-6 w-full bg-white text-lg text-accent-deep shadow-sm"
         >
-          ＋ {t.newEstimate}
+          + {t.newEstimate}
         </Link>
       </section>
 
@@ -126,6 +141,18 @@ export default async function HomePage({
         <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
         </p>
+      )}
+
+      {profileIncomplete && (
+        <Link
+          href="/settings"
+          className="card mt-4 flex items-center justify-between gap-3 border-amber-200 bg-amber-50 p-4"
+        >
+          <span className="text-sm font-semibold text-amber-900">{t.profileIncomplete}</span>
+          <span className="shrink-0 text-sm font-extrabold text-amber-900 underline">
+            {t.finishSetup}
+          </span>
+        </Link>
       )}
 
       {/* ---------- search + filter ---------- */}
@@ -139,7 +166,7 @@ export default async function HomePage({
         />
         {type && <input type="hidden" name="type" value={type} />}
         <button type="submit" className="btn-secondary px-4" aria-label="Search">
-          🔍
+          <Icon name="search" />
         </button>
       </form>
 
@@ -170,12 +197,9 @@ export default async function HomePage({
 
       {docs.length === 0 ? (
         <div className="card mt-3 p-8 text-center">
-          <p className="text-4xl" aria-hidden>
-            🧾
-          </p>
           <p className="mt-3 text-lg text-stone-600">{t.noDocsYet}</p>
           <Link href="/documents/new?type=estimate" className="btn-primary mt-5">
-            ＋ {t.newEstimate}
+            + {t.newEstimate}
           </Link>
         </div>
       ) : (

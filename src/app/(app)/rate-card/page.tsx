@@ -81,7 +81,7 @@ export default async function RateCardPage({
           </div>
         )}
         <button type="submit" className="btn-primary w-full">
-          ＋ {t.addRateItem}
+          + {t.addRateItem}
         </button>
       </form>
 
@@ -137,7 +137,7 @@ export default async function RateCardPage({
                   message={t.confirmDeleteRateItem}
                   className="min-h-[44px] rounded-xl px-3 text-sm font-semibold text-red-700 active:bg-red-50"
                 >
-                  ✕ {t.delete}
+                  × {t.delete}
                 </ConfirmButton>
               </form>
             </li>

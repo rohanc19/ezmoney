@@ -39,8 +39,9 @@ export function formatIndianNumber(n: number, decimals = 2): string {
   return (neg ? "-" : "") + grouped + (decPart ? "." + decPart : "");
 }
 
-/** ₹12,34,567.50 */
+/** ₹12,34,567.50 — and -₹5,040 for a loss, never ₹-5,040. */
 export function formatINR(n: number, decimals = 2): string {
+  if (n < 0) return "-₹" + formatIndianNumber(Math.abs(n), decimals);
   return "₹" + formatIndianNumber(n, decimals);
 }
 

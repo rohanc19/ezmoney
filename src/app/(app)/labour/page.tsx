@@ -48,7 +48,7 @@ export default async function LabourPage() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-extrabold">{t.labour}</h1>
         <Link href="/labour/new" className="btn-secondary">
-          ＋ {t.addWorker}
+          + {t.addWorker}
         </Link>
       </div>
 
@@ -73,7 +73,7 @@ export default async function LabourPage() {
         <div className="card mt-6 p-8 text-center">
           <p className="text-lg text-stone-600">{t.noWorkersYet}</p>
           <Link href="/labour/new" className="btn-primary mt-5">
-            ＋ {t.addWorker}
+            + {t.addWorker}
           </Link>
         </div>
       ) : (

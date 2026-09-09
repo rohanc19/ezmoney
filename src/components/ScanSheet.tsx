@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/format";
 import { downscaleImage } from "@/lib/image";
 import type { Dict } from "@/lib/i18n";
@@ -74,7 +75,13 @@ export default function ScanSheet({ t, onAdd }: Props) {
         disabled={busy}
         onClick={() => inputRef.current?.click()}
       >
-        {busy ? t.scanning : `📷 ${t.scanBill}`}
+        {busy ? (
+          t.scanning
+        ) : (
+          <>
+            <Icon name="camera" /> {t.scanBill}
+          </>
+        )}
       </button>
 
       {error && (
@@ -88,7 +95,7 @@ export default function ScanSheet({ t, onAdd }: Props) {
           <div className="flex items-center justify-between border-b border-line bg-white px-4 py-3">
             <h2 className="text-lg font-extrabold">{t.scanBill}</h2>
             <button type="button" className="btn-ghost px-3" onClick={() => setResult(null)}>
-              ✕ {t.cancel}
+              × {t.cancel}
             </button>
           </div>
 
