@@ -13,7 +13,10 @@ export default async function NewDocumentPage({
 }) {
   const t = getDict();
   const type = searchParams.type === "invoice" ? "invoice" : "estimate";
-  const { clients, profile, rateCard, recentDescriptions, today } = await getFormData();
+  const { clients, profile, rateCard, recentDescriptions, priceHints, today } = await getFormData();
+
+  // Start a new bill with his usual service charge already filled in.
+  const usualPercent = Number(profile?.default_service_charge_percent ?? 0);
 
   return (
     <main>
@@ -28,7 +31,16 @@ export default async function NewDocumentPage({
       <DocumentForm
         action={saveDocument}
         type={type}
-        initial={{ doc_date: today, client_id: "", site_job: "", notes: "", status: "draft" }}
+        initial={{
+          doc_date: today,
+          client_id: "",
+          site_job: "",
+          notes: "",
+          status: "draft",
+          service_charge_mode: usualPercent > 0 ? "percent" : "none",
+          service_charge_value: usualPercent > 0 ? String(usualPercent) : "",
+          service_charge_label: profile?.service_charge_label || "Service Charge",
+        }}
         initialItems={[]}
         clients={clients}
         rateCard={rateCard}
@@ -36,6 +48,7 @@ export default async function NewDocumentPage({
         gstRate={Number(profile?.gst_rate ?? 0.18)}
         defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
+        priceHints={priceHints}
         t={t}
       />
     </main>

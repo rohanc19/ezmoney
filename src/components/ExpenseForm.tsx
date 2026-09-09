@@ -4,7 +4,14 @@ import { useRef, useState } from "react";
 import { formatINR } from "@/lib/format";
 import { downscaleImage } from "@/lib/image";
 import type { Dict } from "@/lib/i18n";
-import { EXPENSE_CATEGORIES, PAID_VIA, type Expense, type ScanResult } from "@/lib/types";
+import { savePricesFromScan } from "@/lib/actions";
+import {
+  EXPENSE_CATEGORIES,
+  PAID_VIA,
+  type Expense,
+  type ScanResult,
+  type ScannedItem,
+} from "@/lib/types";
 
 // Add an expense — or photograph the shop bill and let it fill itself in.
 // The photo is kept with the expense, so a year later he can still see
@@ -14,6 +21,7 @@ export default function ExpenseForm({
   t,
   today,
   clients,
+  shops,
   expense,
   receiptUrl,
   action,
@@ -21,6 +29,7 @@ export default function ExpenseForm({
   t: Dict;
   today: string;
   clients: { id: string; name: string }[];
+  shops: { id: string; name: string; area: string }[];
   expense?: Expense | null;
   receiptUrl?: string | null;
   action: (formData: FormData) => Promise<void>;
@@ -42,12 +51,22 @@ export default function ExpenseForm({
   const [vendor, setVendor] = useState(expense?.vendor ?? "");
   const [notes, setNotes] = useState(expense?.notes ?? "");
 
+  // What the photo said the shop charged. Kept aside so he can file it in
+  // the price book — the only way that book ever gets filled.
+  const [scanItems, setScanItems] = useState<ScannedItem[]>([]);
+  const [priceShop, setPriceShop] = useState("");
+  const [newShopArea, setNewShopArea] = useState("");
+  const [savingPrices, setSavingPrices] = useState(false);
+  const [pricesNote, setPricesNote] = useState<string | null>(null);
+
   async function choosePhoto(file: File) {
     const small = await downscaleImage(file);
     setPhoto(small);
     setRemovePhoto(false);
     setPreview(URL.createObjectURL(small));
     setScanNote(null);
+    setScanItems([]);
+    setPricesNote(null);
   }
 
   async function fillFromPhoto() {
@@ -63,6 +82,12 @@ export default function ExpenseForm({
         setScanNote(json.error ?? t.genericError);
       } else {
         const scan = json as ScanResult;
+        setScanItems(scan.items ?? []);
+        // A shop he already buys from, matched on the name the photo read.
+        const known = scan.vendor
+          ? shops.find((sh) => sh.name.toLowerCase() === scan.vendor.trim().toLowerCase())
+          : undefined;
+        setPriceShop(known ? known.id : scan.vendor ? "__new" : "");
         if (scan.vendor) setVendor(scan.vendor);
         if (scan.date) setDate(scan.date);
         if (scan.grandTotal) setAmount(String(scan.grandTotal));
@@ -79,6 +104,31 @@ export default function ExpenseForm({
       setScanNote(t.genericError);
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function keepPrices() {
+    if (scanItems.length === 0) return;
+    setSavingPrices(true);
+    setPricesNote(null);
+    try {
+      const res = await savePricesFromScan({
+        shopId: priceShop,
+        newShopName: vendor,
+        newShopArea,
+        seenOn: date,
+        items: scanItems.map((i) => ({ item: i.description, unit: i.unit, rate: i.rate })),
+      });
+      setPricesNote(
+        res.saved > 0
+          ? `${res.saved} ${t.pricesSaved}${res.shopName ? ` — ${res.shopName}` : ""}`
+          : t.genericError
+      );
+      if (res.saved > 0) setScanItems([]);
+    } catch {
+      setPricesNote(t.genericError);
+    } finally {
+      setSavingPrices(false);
     }
   }
 
@@ -169,6 +219,73 @@ export default function ExpenseForm({
           </p>
         )}
       </div>
+
+      {/* one tap: what this bill charged becomes the price book */}
+      {scanItems.length > 0 && (
+        <div className="card p-4">
+          <p className="label mb-1">{t.savePricesFromBill}</p>
+          <p className="text-sm text-stone-500">{t.savePricesHint}</p>
+
+          <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-sm">
+            {scanItems.map((i, n) => (
+              <li key={n} className="flex justify-between gap-3">
+                <span className="min-w-0 truncate text-stone-700">{i.description}</span>
+                <span className="tnum shrink-0 font-semibold">{formatINR(i.rate)}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-3">
+            <label className="mb-0.5 block text-xs text-stone-500" htmlFor="price_shop">
+              {t.whichShop}
+            </label>
+            <select
+              id="price_shop"
+              value={priceShop}
+              onChange={(e) => setPriceShop(e.target.value)}
+              className="field"
+            >
+              <option value="">—</option>
+              {shops.map((sh) => (
+                <option key={sh.id} value={sh.id}>
+                  {sh.name}
+                  {sh.area ? ` · ${sh.area}` : ""}
+                </option>
+              ))}
+              <option value="__new">{t.newShop}</option>
+            </select>
+          </div>
+
+          {priceShop === "__new" && (
+            <p className="mt-2 text-sm text-stone-500">
+              {t.shopName}: <span className="font-semibold text-stone-700">{vendor || "—"}</span>
+            </p>
+          )}
+          {priceShop === "__new" && (
+            <input
+              value={newShopArea}
+              onChange={(e) => setNewShopArea(e.target.value)}
+              placeholder={t.shopArea}
+              className="field mt-2"
+            />
+          )}
+
+          <button
+            type="button"
+            className="btn-secondary mt-3 w-full"
+            disabled={savingPrices || !priceShop || (priceShop === "__new" && !vendor.trim())}
+            onClick={keepPrices}
+          >
+            {savingPrices ? "…" : t.savePricesFromBill}
+          </button>
+
+          {pricesNote && (
+            <p className="mt-2 rounded-xl bg-green-100 p-3 text-center font-semibold text-green-900">
+              {pricesNote}
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor="item" className="label">

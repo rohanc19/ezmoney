@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { computeTotals } from "@/lib/gst";
+import { computeServiceCharge, computeTotals } from "@/lib/gst";
+import { itemKey } from "@/lib/prices";
 import { supabaseServer } from "@/lib/supabase/server";
 import { STATES } from "@/lib/types";
 
@@ -118,7 +119,7 @@ export async function saveDocument(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("business_profile")
-    .select("gst_enabled, gst_rate, state_code, default_hsn_sac")
+    .select("gst_enabled, gst_rate, state_code, default_hsn_sac, service_charge_label")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -133,6 +134,15 @@ export async function saveDocument(formData: FormData) {
     if (client?.state_code) placeOfSupply = client.state_code;
   }
 
+  // Service charge — his fee for the job, on top of the items.
+  const scModeRaw = String(formData.get("service_charge_mode") ?? "none");
+  const service_charge_mode = ["percent", "amount"].includes(scModeRaw) ? scModeRaw : "none";
+  const service_charge_value = Math.max(0, Number(formData.get("service_charge_value")) || 0);
+  const service_charge_label =
+    String(formData.get("service_charge_label") ?? "").trim() ||
+    profile?.service_charge_label ||
+    "Service Charge";
+
   const gstRate = Number(profile?.gst_rate ?? 0.18);
   const taxLines = items.map((i) => ({
     description: i.description,
@@ -144,11 +154,19 @@ export async function saveDocument(formData: FormData) {
     gst_rate: gstRate,
   }));
 
+  const itemsSubtotal = taxLines.reduce((s, i) => s + i.amount, 0);
+  const service_charge_amount = computeServiceCharge(
+    itemsSubtotal,
+    service_charge_mode,
+    service_charge_value
+  );
+
   const totals = computeTotals(taxLines, {
     gstEnabled: profile?.gst_enabled ?? false,
     sellerStateCode: profile?.state_code ?? "",
     placeOfSupplyCode: placeOfSupply,
     fallbackRate: gstRate,
+    serviceCharge: service_charge_amount,
   });
 
   const docFields = {
@@ -156,6 +174,10 @@ export async function saveDocument(formData: FormData) {
     client_id,
     site_job,
     status,
+    service_charge_mode,
+    service_charge_value,
+    service_charge_amount,
+    service_charge_label,
     subtotal: totals.subtotal,
     taxable_value: totals.taxableValue,
     gst_amount: totals.gstAmount,
@@ -288,6 +310,10 @@ export async function convertToInvoice(formData: FormData) {
       sgst_amount: est.sgst_amount,
       igst_amount: est.igst_amount,
       place_of_supply: est.place_of_supply,
+      service_charge_mode: est.service_charge_mode ?? "none",
+      service_charge_value: est.service_charge_value ?? 0,
+      service_charge_amount: est.service_charge_amount ?? 0,
+      service_charge_label: est.service_charge_label ?? "Service Charge",
       total: est.total,
       notes: est.notes,
     })
@@ -528,6 +554,9 @@ export async function saveProfile(formData: FormData) {
     state_code: code,
     state_name: stateName(code) || "Karnataka",
     default_hsn_sac: String(formData.get("default_hsn_sac") ?? "").trim(),
+    default_service_charge_percent: Number(formData.get("default_service_charge_percent")) || 0,
+    service_charge_label:
+      String(formData.get("service_charge_label") ?? "").trim() || "Service Charge",
     bank_name: String(formData.get("bank_name") ?? "").trim(),
     account_no: String(formData.get("account_no") ?? "").trim(),
     ifsc: String(formData.get("ifsc") ?? "").trim(),
@@ -539,4 +568,282 @@ export async function saveProfile(formData: FormData) {
   if (error) throw error;
   revalidatePath("/", "layout");
   redirect("/settings?saved=1");
+}
+
+// ---------- labour: the people he hires ----------
+
+export async function saveWorker(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const row = {
+    name: String(formData.get("name") ?? "").trim(),
+    phone: String(formData.get("phone") ?? "").trim(),
+    skill: String(formData.get("skill") ?? "Helper"),
+    daily_rate: Number(formData.get("daily_rate")) || 0,
+    address: String(formData.get("address") ?? "").trim(),
+    notes: String(formData.get("notes") ?? "").trim(),
+    active: formData.get("active") !== "off",
+  };
+  if (!row.name) redirect("/labour");
+
+  if (id) {
+    const { error } = await supabase
+      .from("workers")
+      .update(row)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    revalidatePath(`/labour/${id}`);
+    redirect(`/labour/${id}?saved=1`);
+  }
+  const { data, error } = await supabase
+    .from("workers")
+    .insert({ user_id: user.id, ...row })
+    .select("id")
+    .single();
+  if (error) throw error;
+  revalidatePath("/labour");
+  redirect(`/labour/${data.id}?saved=1`);
+}
+
+export async function deleteWorker(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  // The entries go with the person (cascade in the schema).
+  const { error } = await supabase.from("workers").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/labour");
+  redirect("/labour");
+}
+
+/**
+ * One line in a person's book. Work rows carry days x rate; payment and
+ * advance rows carry the money handed over. Either way `amount` holds the
+ * rupee figure, so a balance is a single sum.
+ */
+export async function saveWorkerEntry(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const worker_id = String(formData.get("worker_id") ?? "");
+  if (!worker_id) redirect("/labour");
+
+  const kindRaw = String(formData.get("kind") ?? "work");
+  const kind = ["work", "payment", "advance"].includes(kindRaw) ? kindRaw : "work";
+  const entry_date =
+    String(formData.get("entry_date") ?? "") || new Date().toISOString().slice(0, 10);
+
+  let days = 0;
+  let rate = 0;
+  let amount = 0;
+  if (kind === "work") {
+    days = Number(formData.get("days")) || 0;
+    rate = Number(formData.get("rate")) || 0;
+    // A typed total wins over the arithmetic — some jobs are a lump sum.
+    const typed = Number(formData.get("amount")) || 0;
+    amount = typed > 0 ? typed : days * rate;
+  } else {
+    amount = Number(formData.get("amount")) || 0;
+  }
+  if (amount <= 0) redirect(`/labour/${worker_id}`);
+
+  const { error } = await supabase.from("worker_entries").insert({
+    user_id: user.id,
+    worker_id,
+    entry_date,
+    kind,
+    days,
+    rate,
+    site_job: String(formData.get("site_job") ?? "").trim(),
+    client_id: String(formData.get("client_id") ?? "") || null,
+    paid_via: kind === "work" ? "Cash" : String(formData.get("paid_via") ?? "Cash"),
+    amount: Math.round(amount * 100) / 100,
+    notes: String(formData.get("notes") ?? "").trim(),
+  });
+  if (error) throw error;
+
+  revalidatePath(`/labour/${worker_id}`);
+  revalidatePath("/labour");
+  redirect(`/labour/${worker_id}?saved=1`);
+}
+
+export async function deleteWorkerEntry(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const worker_id = String(formData.get("worker_id") ?? "");
+  const { error } = await supabase
+    .from("worker_entries")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath(`/labour/${worker_id}`);
+  redirect(`/labour/${worker_id}`);
+}
+
+// ---------- bill scanner ----------
+
+/**
+ * Runs one tiny live request against the scanner and reports back in
+ * plain words. It is the difference between "not set up yet" and knowing
+ * that billing needs switching on in Google Cloud.
+ */
+export async function checkScanner() {
+  await requireUser();
+  const { probeProvider } = await import("@/lib/scan/providers");
+  const status = await probeProvider();
+  cookies().set("scan_check", JSON.stringify(status), { maxAge: 300, path: "/" });
+  redirect("/settings?scan=1#scanner");
+}
+
+// ---------- shops & prices ----------
+
+export async function saveShop(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const row = {
+    name: String(formData.get("name") ?? "").trim(),
+    area: String(formData.get("area") ?? "").trim(),
+    phone: String(formData.get("phone") ?? "").trim(),
+    address: String(formData.get("address") ?? "").trim(),
+    notes: String(formData.get("notes") ?? "").trim(),
+  };
+  if (!row.name) redirect("/shops");
+
+  if (id) {
+    const { error } = await supabase
+      .from("shops")
+      .update(row)
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+    revalidatePath(`/shops/${id}`);
+    redirect(`/shops/${id}?saved=1`);
+  }
+  const { data, error } = await supabase
+    .from("shops")
+    .insert({ user_id: user.id, ...row })
+    .select("id")
+    .single();
+  if (error) throw error;
+  revalidatePath("/shops");
+  redirect(`/shops/${data.id}?saved=1`);
+}
+
+export async function deleteShop(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { error } = await supabase.from("shops").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/shops");
+  redirect("/shops");
+}
+
+/** One price, seen today (or on a day he picks), at one shop. */
+export async function savePrice(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const shop_id = String(formData.get("shop_id") ?? "");
+  const item = String(formData.get("item") ?? "").trim();
+  const rate = Number(formData.get("rate")) || 0;
+  if (!shop_id || !item || rate <= 0) redirect(shop_id ? `/shops/${shop_id}` : "/shops");
+
+  const { error } = await supabase.from("item_prices").insert({
+    user_id: user.id,
+    shop_id,
+    item,
+    item_key: itemKey(item),
+    unit: String(formData.get("unit") ?? "Nos"),
+    rate,
+    seen_on: String(formData.get("seen_on") ?? "") || new Date().toISOString().slice(0, 10),
+    source: "manual",
+    notes: String(formData.get("notes") ?? "").trim(),
+  });
+  if (error) throw error;
+  revalidatePath(`/shops/${shop_id}`);
+  redirect(`/shops/${shop_id}?saved=1`);
+}
+
+export async function deletePrice(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const shop_id = String(formData.get("shop_id") ?? "");
+  const { error } = await supabase
+    .from("item_prices")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath(`/shops/${shop_id}`);
+  redirect(`/shops/${shop_id}`);
+}
+
+/**
+ * The one that makes the price book worth having: the lines just read off
+ * a photographed supplier bill, saved as today's prices at that shop, in
+ * one tap. A price book nobody fills is a price book nobody reads.
+ */
+export async function savePricesFromScan(payload: {
+  shopId: string;
+  newShopName: string;
+  newShopArea: string;
+  seenOn: string;
+  items: { item: string; unit: string; rate: number }[];
+}): Promise<{ saved: number; shopName: string }> {
+  const { supabase, user } = await requireUser();
+
+  let shopId = payload.shopId;
+  let shopName = "";
+  if (shopId === "__new" || !shopId) {
+    const name = payload.newShopName.trim();
+    if (!name) return { saved: 0, shopName: "" };
+
+    // He may have bought here before under the same name. Reuse that shop
+    // rather than upserting over it — an upsert would blank the area he
+    // typed in the first time.
+    const { data: existing } = await supabase
+      .from("shops")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .eq("name", name)
+      .maybeSingle();
+
+    if (existing) {
+      shopId = existing.id;
+      shopName = existing.name;
+    } else {
+      const { data: shop, error } = await supabase
+        .from("shops")
+        .insert({ user_id: user.id, name, area: payload.newShopArea.trim() })
+        .select("id, name")
+        .single();
+      if (error) throw error;
+      shopId = shop.id;
+      shopName = shop.name;
+    }
+  } else {
+    const { data: shop } = await supabase
+      .from("shops")
+      .select("name")
+      .eq("id", shopId)
+      .maybeSingle();
+    shopName = shop?.name ?? "";
+  }
+
+  const rows = payload.items
+    .filter((i) => i.item.trim().length > 1 && Number(i.rate) > 0)
+    .map((i) => ({
+      user_id: user.id,
+      shop_id: shopId,
+      item: i.item.trim().slice(0, 120),
+      item_key: itemKey(i.item),
+      unit: i.unit || "Nos",
+      rate: Number(i.rate),
+      seen_on: payload.seenOn || new Date().toISOString().slice(0, 10),
+      source: "scan",
+    }));
+  if (rows.length === 0) return { saved: 0, shopName };
+
+  const { error } = await supabase.from("item_prices").insert(rows);
+  if (error) throw error;
+
+  revalidatePath("/shops");
+  return { saved: rows.length, shopName };
 }

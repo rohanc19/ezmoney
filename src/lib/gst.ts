@@ -28,6 +28,8 @@ export interface SlabSummary {
 
 export interface Totals {
   subtotal: number;
+  /** His fee for the job, on top of the items. Taxed like a service. */
+  serviceCharge: number;
   taxableValue: number;
   cgst: number;
   sgst: number;
@@ -42,6 +44,23 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * The service charge in rupees.
+ *   percent → that percentage of the items
+ *   amount  → the figure he typed
+ * Rounded here, once, so the same number is stored, shown and printed.
+ */
+export function computeServiceCharge(
+  itemsSubtotal: number,
+  mode: string,
+  value: number
+): number {
+  const v = Number(value) || 0;
+  if (mode === "percent") return round2((itemsSubtotal * v) / 100);
+  if (mode === "amount") return round2(v);
+  return 0;
+}
+
 export function computeTotals(
   items: TaxLine[],
   opts: {
@@ -49,19 +68,23 @@ export function computeTotals(
     sellerStateCode: string;
     placeOfSupplyCode: string;
     fallbackRate: number;
+    /** Already in rupees — see computeServiceCharge. */
+    serviceCharge?: number;
   }
 ): Totals {
   const subtotal = round2(items.reduce((s, i) => s + i.qty * i.rate, 0));
+  const serviceCharge = round2(Number(opts.serviceCharge) || 0);
 
   if (!opts.gstEnabled) {
     return {
       subtotal,
-      taxableValue: subtotal,
+      serviceCharge,
+      taxableValue: round2(subtotal + serviceCharge),
       cgst: 0,
       sgst: 0,
       igst: 0,
       gstAmount: 0,
-      total: subtotal,
+      total: round2(subtotal + serviceCharge),
       interState: false,
       slabs: [],
     };
@@ -73,10 +96,20 @@ export function computeTotals(
     !!opts.sellerStateCode &&
     opts.placeOfSupplyCode !== opts.sellerStateCode;
 
+  // The service charge is a supply like any other, so it is taxed at the
+  // standard rate and joins its slab in the summary table.
+  const taxed: { taxable: number; gst_rate: number }[] = items.map((i) => ({
+    taxable: i.qty * i.rate,
+    gst_rate: i.gst_rate,
+  }));
+  if (serviceCharge !== 0) {
+    taxed.push({ taxable: serviceCharge, gst_rate: opts.fallbackRate });
+  }
+
   const bySlab = new Map<number, SlabSummary>();
-  for (const item of items) {
+  for (const item of taxed) {
     const rate = item.gst_rate > 0 ? item.gst_rate : opts.fallbackRate;
-    const taxable = item.qty * item.rate;
+    const taxable = item.taxable;
     const tax = taxable * rate;
     const slab = bySlab.get(rate) ?? {
       rate,
@@ -110,14 +143,17 @@ export function computeTotals(
   const igst = round2(slabs.reduce((s, x) => s + x.igst, 0));
   const gstAmount = round2(cgst + sgst + igst);
 
+  const taxableValue = round2(subtotal + serviceCharge);
+
   return {
     subtotal,
-    taxableValue: subtotal,
+    serviceCharge,
+    taxableValue,
     cgst,
     sgst,
     igst,
     gstAmount,
-    total: round2(subtotal + gstAmount),
+    total: round2(taxableValue + gstAmount),
     interState,
     slabs,
   };

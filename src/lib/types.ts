@@ -7,6 +7,16 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 export const PAID_VIA = ["Cash", "UPI", "Card", "Bank", "Credit"] as const;
 
+// What the people he hires actually do on site. His words.
+export const WORKER_SKILLS = [
+  "Helper", "Wireman", "Electrician", "Assistant", "Painter", "Mason", "Other",
+] as const;
+
+export type WorkerEntryKind = "work" | "payment" | "advance";
+
+// A service charge is either a percentage of the items or a flat figure.
+export type ServiceChargeMode = "none" | "percent" | "amount";
+
 // GST state codes — used to decide CGST+SGST (same state) vs IGST.
 export const STATES: { code: string; name: string }[] = [
   { code: "29", name: "Karnataka" },
@@ -58,6 +68,8 @@ export interface BusinessProfile {
   state_name: string;
   default_hsn_sac: string;
   invoice_footer_note: string;
+  default_service_charge_percent: number;
+  service_charge_label: string;
 }
 
 export interface Client {
@@ -100,6 +112,10 @@ export interface DocumentRow {
   sgst_amount: number;
   igst_amount: number;
   place_of_supply: string;
+  service_charge_mode: ServiceChargeMode;
+  service_charge_value: number;
+  service_charge_amount: number;
+  service_charge_label: string;
   total: number;
   notes: string;
   clients?: { name: string; phone: string; address: string } | null;
@@ -116,6 +132,63 @@ export interface Expense {
   paid_via: string;
   notes: string;
   receipt_path: string | null;
+}
+
+export interface Worker {
+  id: string;
+  name: string;
+  phone: string;
+  skill: string;
+  daily_rate: number;
+  address: string;
+  notes: string;
+  active: boolean;
+}
+
+/** One line in a worker's book: a day worked, or money handed over. */
+export interface WorkerEntry {
+  id: string;
+  worker_id: string;
+  entry_date: string;
+  kind: WorkerEntryKind;
+  days: number;
+  rate: number;
+  site_job: string;
+  client_id: string | null;
+  paid_via: string;
+  amount: number;
+  notes: string;
+  clients?: { name: string } | null;
+}
+
+export interface Shop {
+  id: string;
+  name: string;
+  /** The locality — SP Road, Peenya, Jalahalli. How he judges the trip. */
+  area: string;
+  phone: string;
+  address: string;
+  notes: string;
+}
+
+export interface ItemPrice {
+  id: string;
+  shop_id: string;
+  item: string;
+  item_key: string;
+  unit: string;
+  rate: number;
+  seen_on: string;
+  source: string;
+  notes: string;
+}
+
+/** What the bill form whispers under a material he is typing. */
+export interface PriceHint {
+  key: string;
+  item: string;
+  unit: string;
+  quotes: { shop: string; area: string; rate: number; stale: boolean }[];
 }
 
 export interface RateCardItem {

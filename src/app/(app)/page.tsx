@@ -41,7 +41,7 @@ export default async function HomePage({
   const year = new Date().getFullYear();
   const from = `${year}-01-01`;
   const to = `${year}-12-31`;
-  const [{ data: yearInvoices }, { data: yearExpenses }] = await Promise.all([
+  const [{ data: yearInvoices }, { data: yearExpenses }, { data: yearLabour }] = await Promise.all([
     supabase
       .from("documents")
       .select("total, status")
@@ -49,13 +49,23 @@ export default async function HomePage({
       .gte("doc_date", from)
       .lte("doc_date", to),
     supabase.from("expenses").select("amount").gte("date", from).lte("date", to),
+    // Money handed to the people he hires is real money out, so it
+    // belongs in the year's spend alongside materials.
+    supabase
+      .from("worker_entries")
+      .select("amount, kind")
+      .neq("kind", "work")
+      .gte("entry_date", from)
+      .lte("entry_date", to),
   ]);
   const invoiced = (yearInvoices ?? []).reduce((s, d) => s + Number(d.total), 0);
   const received = (yearInvoices ?? [])
     .filter((d) => d.status === "paid")
     .reduce((s, d) => s + Number(d.total), 0);
   const pending = invoiced - received;
-  const spent = (yearExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  const spent =
+    (yearExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0) +
+    (yearLabour ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const profit = received - spent;
 
   const filters = [

@@ -5,7 +5,14 @@ import RatePicker from "@/components/RatePicker";
 import ScanSheet from "@/components/ScanSheet";
 import { formatINR } from "@/lib/format";
 import type { Dict } from "@/lib/i18n";
-import { STATES, UNITS, type RateCardItem, type ScannedItem } from "@/lib/types";
+import { matchesQuery } from "@/lib/prices";
+import {
+  STATES,
+  UNITS,
+  type PriceHint,
+  type RateCardItem,
+  type ScannedItem,
+} from "@/lib/types";
 
 interface ItemState {
   description: string;
@@ -25,6 +32,9 @@ interface Props {
     site_job: string;
     notes: string;
     status: string;
+    service_charge_mode: string;
+    service_charge_value: string;
+    service_charge_label: string;
   };
   initialItems: ItemState[];
   clients: { id: string; name: string }[];
@@ -33,6 +43,7 @@ interface Props {
   gstRate: number;
   defaultHsn: string;
   recentDescriptions: string[];
+  priceHints: PriceHint[];
   t: Dict;
 }
 
@@ -56,6 +67,7 @@ export default function DocumentForm({
   gstRate,
   defaultHsn,
   recentDescriptions,
+  priceHints,
   t,
 }: Props) {
   const draftKey = `ezmoney-draft-${id ?? "new-" + type}`;
@@ -67,6 +79,9 @@ export default function DocumentForm({
   const [siteJob, setSiteJob] = useState(initial.site_job);
   const [notes, setNotes] = useState(initial.notes);
   const [status, setStatus] = useState(initial.status);
+  const [scMode, setScMode] = useState(initial.service_charge_mode);
+  const [scValue, setScValue] = useState(initial.service_charge_value);
+  const [scLabel, setScLabel] = useState(initial.service_charge_label);
   const [newClient, setNewClient] = useState({ name: "", phone: "", address: "", state: "29" });
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,6 +102,9 @@ export default function DocumentForm({
         if (d.siteJob) setSiteJob(d.siteJob);
         if (d.notes) setNotes(d.notes);
         if (d.newClient) setNewClient(d.newClient);
+        if (d.scMode) setScMode(d.scMode);
+        if (d.scValue) setScValue(d.scValue);
+        if (d.scLabel) setScLabel(d.scLabel);
         if (d.siteJob || (d.items ?? []).some((i: ItemState) => i.description)) setRestored(true);
       }
     } catch {
@@ -99,19 +117,40 @@ export default function DocumentForm({
   useEffect(() => {
     if (!loaded.current || id) return;
     try {
-      localStorage.setItem(draftKey, JSON.stringify({ items, clientId, siteJob, notes, newClient }));
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({ items, clientId, siteJob, notes, newClient, scMode, scValue, scLabel })
+      );
     } catch {
       /* ignore */
     }
-  }, [items, clientId, siteJob, notes, newClient, draftKey, id]);
+  }, [items, clientId, siteJob, notes, newClient, scMode, scValue, scLabel, draftKey, id]);
 
   // ---- live totals ----
   const subtotal = useMemo(
     () => items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.rate) || 0), 0),
     [items]
   );
-  const gstAmount = gstEnabled ? subtotal * gstRate : 0;
-  const total = subtotal + gstAmount;
+  // Mirrors computeServiceCharge on the server, so the figure he sees
+  // while typing is the figure that gets saved.
+  const serviceCharge = useMemo(() => {
+    const v = Number(scValue) || 0;
+    if (scMode === "percent") return Math.round(((subtotal * v) / 100) * 100) / 100;
+    if (scMode === "amount") return Math.round(v * 100) / 100;
+    return 0;
+  }, [scMode, scValue, subtotal]);
+
+  const taxable = subtotal + serviceCharge;
+  const gstAmount = gstEnabled ? taxable * gstRate : 0;
+  const total = taxable + gstAmount;
+
+  // What he has paid for this material before, shown under the description
+  // as he types it. Matching is deliberately loose — the same wire is
+  // written differently on every shop's bill.
+  const findHint = (text: string): PriceHint | null => {
+    if (text.trim().length < 3) return null;
+    return priceHints.find((h) => matchesQuery(h.key, text)) ?? null;
+  };
 
   const itemsJson = JSON.stringify(
     items
@@ -300,6 +339,25 @@ export default function DocumentForm({
                 list="recent-descriptions"
                 className="field"
               />
+              {(() => {
+                const hint = findHint(item.description);
+                if (!hint || hint.quotes.length === 0) return null;
+                return (
+                  <p className="mt-1.5 text-xs leading-snug text-stone-500">
+                    <span className="font-semibold text-stone-600">{t.knownPrices}: </span>
+                    {hint.quotes.map((qt, i) => (
+                      <span key={qt.shop + i}>
+                        {i > 0 ? " · " : ""}
+                        <span className="tnum font-semibold">{formatINR(qt.rate, 0)}</span>
+                        {" — "}
+                        {qt.shop}
+                        {qt.area ? ` (${qt.area})` : ""}
+                        {qt.stale ? ` — ${t.oldPrice}` : ""}
+                      </span>
+                    ))}
+                  </p>
+                );
+              })()}
               <div className="mt-2 flex gap-2">
                 <div className="w-20">
                   <label className="mb-0.5 block text-xs text-stone-500">{t.qty}</label>
@@ -370,12 +428,71 @@ export default function DocumentForm({
         </button>
       </div>
 
+      {/* service charge — his fee for the job, on top of the items */}
+      <div>
+        <p className="label">{t.serviceCharge}</p>
+        <div className="card space-y-3 p-4">
+          <p className="text-sm text-stone-500">{t.serviceChargeHint}</p>
+          <select
+            name="service_charge_mode"
+            value={scMode}
+            onChange={(e) => setScMode(e.target.value)}
+            className="field"
+            aria-label={t.serviceCharge}
+          >
+            <option value="none">{t.serviceChargeNone}</option>
+            <option value="percent">{t.serviceChargePercent}</option>
+            <option value="amount">{t.serviceChargeFixed}</option>
+          </select>
+
+          {scMode !== "none" && (
+            <>
+              <div>
+                <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_value">
+                  {scMode === "percent" ? t.percentOfItems : `${t.amount} (₹)`}
+                </label>
+                <input
+                  id="sc_value"
+                  name="service_charge_value"
+                  value={scValue}
+                  onChange={(e) => setScValue(e.target.value)}
+                  inputMode="decimal"
+                  className="field tnum"
+                />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_label">
+                  {t.serviceChargeName}
+                </label>
+                <input
+                  id="sc_label"
+                  name="service_charge_label"
+                  value={scLabel}
+                  onChange={(e) => setScLabel(e.target.value)}
+                  className="field"
+                />
+              </div>
+              <div className="flex justify-between border-t border-line pt-2 font-bold">
+                <span>{scLabel || t.serviceCharge}</span>
+                <span className="tnum">{formatINR(serviceCharge)}</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {/* totals */}
       <div className="card p-4">
         <div className="flex justify-between text-stone-600">
           <span>{t.subtotal}</span>
           <span className="tnum">{formatINR(subtotal)}</span>
         </div>
+        {serviceCharge !== 0 && (
+          <div className="mt-1 flex justify-between text-stone-600">
+            <span>{scLabel || t.serviceCharge}</span>
+            <span className="tnum">{formatINR(serviceCharge)}</span>
+          </div>
+        )}
         {gstEnabled && (
           <div className="mt-1 flex justify-between text-stone-600">
             <span>

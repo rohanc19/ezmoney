@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { providerConfigured, scanImage } from "@/lib/scan/providers";
+import { ScanError, providerConfigured, scanImage } from "@/lib/scan/providers";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
 
   if (!providerConfigured()) {
     return NextResponse.json(
-      { error: "Photo reading isn't set up yet. Add the scanner key in Vercel and redeploy." },
+      {
+        error:
+          "Photo reading isn't set up yet. Open Settings → Bill scanner and tap Check the scanner to see what is missing.",
+      },
       { status: 503 }
     );
   }
@@ -44,9 +47,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     console.error("scan failed", err);
-    return NextResponse.json(
-      { error: "Could not read that photo. Try again in better light, or type the items in." },
-      { status: 502 }
-    );
+    // ScanError already carries a sentence that names the fix.
+    const message =
+      err instanceof ScanError
+        ? err.friendly
+        : "Could not read that photo. Try again in better light, or type the items in.";
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

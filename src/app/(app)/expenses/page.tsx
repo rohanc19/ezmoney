@@ -38,6 +38,16 @@ export default async function ExpensesPage({
         </p>
       )}
 
+      <Link href="/shops" className="card mt-4 flex items-center justify-between gap-3 p-4">
+        <span className="min-w-0">
+          <span className="block font-extrabold">{t.priceBook}</span>
+          <span className="block text-sm text-stone-500">{t.priceBookHint}</span>
+        </span>
+        <span aria-hidden className="shrink-0 text-2xl text-stone-400">
+          ›
+        </span>
+      </Link>
+
       <div className="card mt-4 flex items-center justify-between p-4">
         <span className="font-semibold text-stone-600">
           {t.totalExpenses} · {year}

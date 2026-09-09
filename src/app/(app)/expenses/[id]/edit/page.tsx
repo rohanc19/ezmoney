@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
 export default async function EditExpensePage({ params }: { params: { id: string } }) {
   const t = getDict();
   const supabase = supabaseServer();
-  const [{ data: expense }, { data: clients }] = await Promise.all([
+  const [{ data: expense }, { data: clients }, { data: shops }] = await Promise.all([
     supabase.from("expenses").select("*").eq("id", params.id).maybeSingle(),
     supabase.from("clients").select("id, name").order("name"),
+    supabase.from("shops").select("id, name, area").order("name"),
   ]);
   if (!expense) notFound();
 
@@ -34,6 +35,7 @@ export default async function EditExpensePage({ params }: { params: { id: string
         t={t}
         today={todayISO()}
         clients={clients ?? []}
+        shops={shops ?? []}
         expense={expense as Expense}
         receiptUrl={photoUrl}
         action={saveExpense}
@@ -42,7 +44,7 @@ export default async function EditExpensePage({ params }: { params: { id: string
         <input type="hidden" name="id" value={expense.id} />
         <input type="hidden" name="receipt_path" value={expense.receipt_path ?? ""} />
         <ConfirmButton message={t.confirmDeleteExpense} className="btn-danger w-full">
-          🗑 {t.delete}
+          {t.delete}
         </ConfirmButton>
       </form>
     </main>

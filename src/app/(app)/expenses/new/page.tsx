@@ -10,7 +10,10 @@ export const dynamic = "force-dynamic";
 export default async function NewExpensePage() {
   const t = getDict();
   const supabase = supabaseServer();
-  const { data: clients } = await supabase.from("clients").select("id, name").order("name");
+  const [{ data: clients }, { data: shops }] = await Promise.all([
+    supabase.from("clients").select("id, name").order("name"),
+    supabase.from("shops").select("id, name, area").order("name"),
+  ]);
 
   return (
     <main>
@@ -20,7 +23,13 @@ export default async function NewExpensePage() {
         </Link>
         <h1 className="text-2xl font-extrabold">{t.addExpense}</h1>
       </div>
-      <ExpenseForm t={t} today={todayISO()} clients={clients ?? []} action={saveExpense} />
+      <ExpenseForm
+        t={t}
+        today={todayISO()}
+        clients={clients ?? []}
+        shops={shops ?? []}
+        action={saveExpense}
+      />
     </main>
   );
 }

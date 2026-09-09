@@ -1,16 +1,33 @@
 import Link from "next/link";
-import { logout, saveProfile, setLanguage } from "@/lib/actions";
+import { cookies } from "next/headers";
+import { checkScanner, logout, saveProfile, setLanguage } from "@/lib/actions";
 import { getDict, getLang } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
 import { STATES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage({ searchParams }: { searchParams: { saved?: string } }) {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: { saved?: string; scan?: string };
+}) {
   const t = getDict();
   const lang = getLang();
   const supabase = supabaseServer();
   const { data: p } = await supabase.from("business_profile").select("*").maybeSingle();
+
+  // The result of the last "Check the scanner" tap, left in a short-lived
+  // cookie by the action so this page stays a plain server render.
+  let scanCheck: { ok: boolean; message: string } | null = null;
+  if (searchParams.scan) {
+    try {
+      const raw = cookies().get("scan_check")?.value;
+      if (raw) scanCheck = JSON.parse(raw);
+    } catch {
+      /* a failed check just shows nothing */
+    }
+  }
 
   return (
     <main>
@@ -29,6 +46,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
           <span className="text-sm text-stone-500">{t.rateCardHint}</span>
         </span>
         <span aria-hidden className="text-2xl text-stone-400">
+          ›
+        </span>
+      </Link>
+
+      <Link href="/shops" className="card mt-3 flex items-center justify-between gap-3 p-4">
+        <span className="min-w-0">
+          <span className="block font-extrabold">{t.priceBook}</span>
+          <span className="block text-sm text-stone-500">{t.priceBookHint}</span>
+        </span>
+        <span aria-hidden className="shrink-0 text-2xl text-stone-400">
           ›
         </span>
       </Link>
@@ -196,6 +223,42 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
           </div>
         </section>
 
+        {/* what he charges for the job itself */}
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.serviceCharge}</h2>
+          <p className="mt-1 text-sm text-stone-500">{t.serviceChargeHint}</p>
+          <div className="mt-3 flex gap-3">
+            <div className="w-32">
+              <label className="label" htmlFor="default_service_charge_percent">
+                {t.defaultServiceCharge}
+              </label>
+              <input
+                id="default_service_charge_percent"
+                name="default_service_charge_percent"
+                inputMode="decimal"
+                defaultValue={
+                  Number(p?.default_service_charge_percent ?? 0) > 0
+                    ? String(p?.default_service_charge_percent)
+                    : ""
+                }
+                className="field tnum"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="label" htmlFor="service_charge_label">
+                {t.serviceChargeName}
+              </label>
+              <input
+                id="service_charge_label"
+                name="service_charge_label"
+                placeholder="Service Charge"
+                defaultValue={p?.service_charge_label ?? ""}
+                className="field"
+              />
+            </div>
+          </div>
+        </section>
+
         <section className="card p-4">
           <h2 className="font-extrabold">{t.bankSection}</h2>
           <div className="mt-3 space-y-4">
@@ -281,6 +344,27 @@ export default async function SettingsPage({ searchParams }: { searchParams: { s
           {t.save}
         </button>
       </form>
+
+      {/* bill scanner — one live check that says exactly what is wrong */}
+      <section id="scanner" className="card mt-4 p-4">
+        <h2 className="font-extrabold">{t.scannerSection}</h2>
+        <p className="mt-1 text-sm text-stone-500">{t.scanHint}</p>
+        {scanCheck && (
+          <p
+            className={`mt-3 rounded-2xl p-3 text-sm font-semibold ${
+              scanCheck.ok ? "bg-green-100 text-green-900" : "bg-amber-50 text-amber-900"
+            }`}
+          >
+            {scanCheck.ok ? "✓ " : ""}
+            {scanCheck.message}
+          </p>
+        )}
+        <form action={checkScanner} className="mt-3">
+          <button type="submit" className="btn-secondary w-full">
+            {t.scannerCheck}
+          </button>
+        </form>
+      </section>
 
       {/* backup */}
       <section className="card mt-4 p-4">

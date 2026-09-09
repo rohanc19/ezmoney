@@ -185,28 +185,226 @@ button.card:active {
 }
 
 /* =============================================================
+   The bill itself.
+   One ruled sheet, drawn the same on screen and on paper: black
+   rules, one warm tint, no rounded corners, no shadows. Everything
+   is sized so an A4 print and the phone view agree.
+   ============================================================= */
+.doc {
+  --doc-rule: #b8b1a3;   /* inner hairlines */
+  --doc-ink: #1c1a17;    /* the box and the strong rules */
+  --doc-tint: #f1efe9;   /* header rows */
+  border: 1.5px solid var(--doc-ink);
+  background: #fff;
+  color: var(--doc-ink);
+}
+
+/* The one line that says what this piece of paper is. */
+.doc-title {
+  border-bottom: 1.5px solid var(--doc-ink);
+  background: var(--doc-tint);
+  padding: 0.55rem 1rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Two panels side by side: who is billing, and the bill's own numbers. */
+.doc-head {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-bottom: 1.5px solid var(--doc-ink);
+}
+.doc-head > * + * {
+  border-top: 1px solid var(--doc-rule);
+}
+@media (min-width: 640px), print {
+  .doc-head {
+    grid-template-columns: 1.35fr 1fr;
+  }
+  .doc-head > * + * {
+    border-top: 0;
+    border-left: 1px solid var(--doc-rule);
+  }
+}
+
+.doc-cell {
+  padding: 0.7rem 0.9rem;
+}
+
+.doc-eyebrow {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #7a736a;
+}
+
+/* Label on the left, value on the right — the shape a clerk expects. */
+.doc-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.12rem 0;
+  font-size: 0.8rem;
+}
+.doc-kv > span:first-child {
+  color: #6b645b;
+}
+.doc-kv > span:last-child {
+  font-weight: 700;
+  text-align: right;
+}
+
+/* The items. A full grid, because a bill with open sides reads as a
+   web page and a bill with ruled cells reads as a bill. */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.doc-table th {
+  background: var(--doc-tint);
+  border: 1px solid var(--doc-rule);
+  border-top: 0;
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.doc-table td {
+  border: 1px solid var(--doc-rule);
+  padding: 0.4rem 0.5rem;
+  vertical-align: top;
+}
+.doc-table th:first-child,
+.doc-table td:first-child {
+  border-left: 0;
+}
+.doc-table th:last-child,
+.doc-table td:last-child {
+  border-right: 0;
+}
+/* The tax summary has few columns and long headings, so it needs even
+   columns rather than letting the widest heading take the page. */
+.doc-table-fixed {
+  table-layout: fixed;
+}
+.doc-table-fixed th:first-child,
+.doc-table-fixed td:first-child {
+  width: 4.5rem;
+}
+
+.doc-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+/* Amount in words on the left, the money stack on the right. */
+.doc-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1.5px solid var(--doc-ink);
+}
+.doc-summary > * + * {
+  border-top: 1px solid var(--doc-rule);
+}
+@media (min-width: 640px), print {
+  .doc-summary {
+    grid-template-columns: 1fr 17rem;
+  }
+  .doc-summary > * + * {
+    border-top: 0;
+    border-left: 1px solid var(--doc-rule);
+  }
+}
+
+.doc-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.22rem 0;
+  font-size: 0.85rem;
+}
+.doc-line-total {
+  margin-top: 0.35rem;
+  border-top: 1.5px solid var(--doc-ink);
+  padding-top: 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* How to pay, and who signed. */
+.doc-foot {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1.5px solid var(--doc-ink);
+}
+.doc-foot > * + * {
+  border-top: 1px solid var(--doc-rule);
+}
+@media (min-width: 640px), print {
+  .doc-foot {
+    grid-template-columns: 1fr 1fr;
+  }
+  .doc-foot > * + * {
+    border-top: 0;
+    border-left: 1px solid var(--doc-rule);
+  }
+}
+
+.doc-sign-line {
+  margin-top: 3.2rem;
+  border-top: 1px solid var(--doc-ink);
+  padding-top: 0.25rem;
+  font-size: 0.72rem;
+  color: #6b645b;
+}
+
+/* =============================================================
    Print — the bill only. No app furniture, no colour tricks.
    ============================================================= */
 @media print {
+  html {
+    font-size: 15px;
+  }
   body {
     background: white !important;
   }
   .no-print {
     display: none !important;
   }
-  .print-page {
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
+  /* The document keeps its rules and its one tint on paper —
+     without this, browsers drop both and the bill prints naked. */
+  .doc,
+  .doc * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc {
+    border-width: 1px;
     margin: 0 !important;
-    padding: 0 !important;
-    max-width: none !important;
+  }
+  .doc-title {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
   }
   .print-avoid-break {
     break-inside: avoid;
   }
+  /* Long bills repeat the column headings on every page. */
+  .doc-table thead {
+    display: table-header-group;
+  }
+  .doc-table tr {
+    break-inside: avoid;
+  }
   @page {
     size: A4;
-    margin: 14mm 12mm;
+    margin: 12mm 10mm;
   }
 }

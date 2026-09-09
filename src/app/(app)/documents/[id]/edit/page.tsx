@@ -18,7 +18,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
   ]);
   if (!doc) notFound();
 
-  const { clients, profile, rateCard, recentDescriptions } = formData;
+  const { clients, profile, rateCard, recentDescriptions, priceHints } = formData;
 
   return (
     <main>
@@ -40,6 +40,11 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
           site_job: doc.site_job,
           notes: doc.notes,
           status: doc.status,
+          service_charge_mode: doc.service_charge_mode ?? "none",
+          service_charge_value:
+            Number(doc.service_charge_value) > 0 ? String(doc.service_charge_value) : "",
+          service_charge_label:
+            doc.service_charge_label || profile?.service_charge_label || "Service Charge",
         }}
         initialItems={(items ?? []).map((i) => ({
           description: i.description,
@@ -54,6 +59,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         gstRate={Number(profile?.gst_rate ?? 0.18)}
         defaultHsn={profile?.default_hsn_sac ?? ""}
         recentDescriptions={recentDescriptions}
+        priceHints={priceHints}
         t={t}
       />
     </main>
