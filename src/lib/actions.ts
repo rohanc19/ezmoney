@@ -357,36 +357,52 @@ async function learnRateCard(
   items: { description: string; unit: string; rate: number; hsn_sac: string }[]
 ) {
   const supabase = supabaseServer();
-  for (const i of items) {
-    if (!i.description || i.rate <= 0) continue;
-    const { data: existing } = await supabase
-      .from("rate_card_items")
-      .select("id, times_used")
-      .eq("user_id", userId)
-      .eq("description", i.description)
-      .maybeSingle();
-    if (existing) {
-      await supabase
-        .from("rate_card_items")
-        .update({
-          rate: i.rate,
-          unit: i.unit,
-          times_used: (existing.times_used ?? 0) + 1,
-          last_used_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("rate_card_items").insert({
+  const wanted = items.filter((i) => i.description && i.rate > 0);
+  if (wanted.length === 0) return;
+
+  // A bill can list the same thing on two lines; the rate card holds one
+  // row per description, so the last one on the bill wins.
+  const byDescription = new Map<string, (typeof wanted)[number]>();
+  for (const i of wanted) byDescription.set(i.description, i);
+  const names = [...byDescription.keys()];
+
+  // Two round-trips for the whole bill, not two per line. This runs on
+  // every save, from a phone on site, against a database in Singapore —
+  // a twelve-line bill used to add twenty-four sequential trips to the
+  // one button he presses most.
+  const { data: existing } = await supabase
+    .from("rate_card_items")
+    .select("description, times_used, hsn_sac")
+    .eq("user_id", userId)
+    .in("description", names);
+
+  const known = new Map(
+    (existing ?? []).map((r) => [
+      r.description as string,
+      { times: Number(r.times_used) || 0, hsn: (r.hsn_sac as string) ?? "" },
+    ])
+  );
+  const now = new Date().toISOString();
+
+  const { error } = await supabase.from("rate_card_items").upsert(
+    names.map((name) => {
+      const i = byDescription.get(name)!;
+      const prev = known.get(name);
+      return {
         user_id: userId,
-        description: i.description,
+        description: name,
         unit: i.unit,
         rate: i.rate,
-        hsn_sac: i.hsn_sac,
-        times_used: 1,
-        last_used_at: new Date().toISOString(),
-      });
-    }
-  }
+        // A bill without an HSN typed must not wipe the one already saved.
+        hsn_sac: i.hsn_sac || prev?.hsn || "",
+        times_used: (prev?.times ?? 0) + 1,
+        last_used_at: now,
+      };
+    }),
+    { onConflict: "user_id,description" }
+  );
+  // Learning his rates is a convenience, not the point of saving a bill.
+  if (error) console.error("rate card learning failed", error);
 }
 
 export async function saveRateCardItem(formData: FormData) {
@@ -561,6 +577,7 @@ export async function saveProfile(formData: FormData) {
     state_code: code,
     state_name: stateName(code) || "Karnataka",
     default_hsn_sac: String(formData.get("default_hsn_sac") ?? "").trim(),
+    logo_url: String(formData.get("logo_url") ?? "").trim(),
     default_service_charge_percent: Number(formData.get("default_service_charge_percent")) || 0,
     service_charge_label:
       String(formData.get("service_charge_label") ?? "").trim() || "Service Charge",

@@ -120,6 +120,13 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **A stale price never wins.** Prices are appended, never overwritten, and
   anything older than `STALE_DAYS` is shown greyed but is barred from being
   crowned cheapest — an old low price must not send him across town.
+- **The printed bill is English only.** Its labels come from `docLabels` in
+  `src/lib/i18n.ts`, never from `t` — the app toggles to Kannada for him, but
+  the sheet goes to his client's accountant. Reaching for `t` inside the
+  printable section is what produced a half-translated tax invoice once.
+- **`business_profile.logo_url` is a path into `public/brand`**, chosen from
+  `LOGO_OPTIONS`. A file whose name contains "lockup" already includes the
+  business name, so the header suppresses the text name for those.
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.

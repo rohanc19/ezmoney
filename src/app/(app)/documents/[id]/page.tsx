@@ -12,7 +12,7 @@ import {
 } from "@/lib/actions";
 import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
 import { computeTotals } from "@/lib/gst";
-import { getDict } from "@/lib/i18n";
+import { docLabels, getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
 import { PAID_VIA, STATES, type Payment } from "@/lib/types";
@@ -124,6 +124,11 @@ export default async function DocumentViewPage({
     });
     if (uri) qrSvg = await upiQrSvg(uri);
   }
+
+  // A lockup file already carries the business name, so printing the name
+  // as text beside it would say it twice.
+  const logoUrl = (profile?.logo_url ?? "").trim();
+  const logoHasName = logoUrl.includes("lockup");
 
   const placeOfSupplyName =
     STATES.find((s) => s.code === doc.place_of_supply)?.name ||
@@ -346,15 +351,32 @@ export default async function DocumentViewPage({
       )}
 
       {/* ---------- the printable document ----------
-           One ruled sheet. Labels here stay in English: this is the
-           piece of paper his client, and their accountant, will read. */}
+           One ruled sheet. Every label comes from docLabels, which is
+           English only: this is the piece of paper his client, and their
+           accountant, will read. Do not reach for `t` below this line. */}
       <div className="doc">
         <p className="doc-title">{title}</p>
 
         {/* who is billing · the bill's own numbers */}
         <div className="doc-head">
           <div className="doc-cell">
-            <p className="text-lg font-extrabold leading-tight">{profile?.business_name}</p>
+            {logoUrl ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logoUrl}
+                  alt={profile?.business_name ?? ""}
+                  className={logoHasName ? "h-12 w-auto" : "h-11 w-auto"}
+                />
+                {!logoHasName && (
+                  <p className="text-lg font-extrabold leading-tight">
+                    {profile?.business_name}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-lg font-extrabold leading-tight">{profile?.business_name}</p>
+            )}
             {profile?.proprietor_name && (
               <p className="text-[0.8rem] text-stone-600">{profile.proprietor_name}</p>
             )}
@@ -397,7 +419,7 @@ export default async function DocumentViewPage({
             )}
             <p className="doc-kv">
               <span>Status</span>
-              <span>{t.statusLabels[doc.status]}</span>
+              <span>{docLabels.status[doc.status]}</span>
             </p>
           </div>
         </div>
@@ -428,7 +450,7 @@ export default async function DocumentViewPage({
               <tr>
                 <th className="w-9">Sr</th>
                 <th>Description</th>
-                {gstOn && <th>{t.hsn}</th>}
+                {gstOn && <th>{docLabels.hsn}</th>}
                 <th className="doc-num">Qty</th>
                 <th>Unit</th>
                 <th className="doc-num">Rate (₹)</th>
@@ -491,14 +513,14 @@ export default async function DocumentViewPage({
                 </p>
                 {gstOn && (
                   <p className="doc-line font-semibold">
-                    <span>{t.taxableValue}</span>
+                    <span>{docLabels.taxableValue}</span>
                     <span className="tnum">{formatINR(totals.taxableValue)}</span>
                   </p>
                 )}
               </>
             ) : (
               <p className="doc-line">
-                <span>{gstOn ? t.taxableValue : t.subtotal}</span>
+                <span>{gstOn ? docLabels.taxableValue : docLabels.subtotal}</span>
                 <span className="tnum">{formatINR(totals.taxableValue)}</span>
               </p>
             )}
@@ -506,35 +528,35 @@ export default async function DocumentViewPage({
             {gstOn &&
               (totals.interState ? (
                 <p className="doc-line">
-                  <span>{t.igst}</span>
+                  <span>{docLabels.igst}</span>
                   <span className="tnum">{formatINR(totals.igst)}</span>
                 </p>
               ) : (
                 <>
                   <p className="doc-line">
-                    <span>{t.cgst}</span>
+                    <span>{docLabels.cgst}</span>
                     <span className="tnum">{formatINR(totals.cgst)}</span>
                   </p>
                   <p className="doc-line">
-                    <span>{t.sgst}</span>
+                    <span>{docLabels.sgst}</span>
                     <span className="tnum">{formatINR(totals.sgst)}</span>
                   </p>
                 </>
               ))}
 
             <p className="doc-line doc-line-total">
-              <span>{t.total}</span>
+              <span>{docLabels.total}</span>
               <span className="tnum">{formatINR(Number(doc.total))}</span>
             </p>
 
             {isInvoice && received > 0 && (
               <>
                 <p className="doc-line">
-                  <span>{t.amountReceived}</span>
+                  <span>{docLabels.received}</span>
                   <span className="tnum">− {formatINR(received)}</span>
                 </p>
                 <p className="doc-line font-extrabold">
-                  <span>{balance > 0 ? t.balanceDue : t.fullySettled}</span>
+                  <span>{balance > 0 ? docLabels.balanceDue : docLabels.fullySettled}</span>
                   <span className="tnum">{formatINR(balance)}</span>
                 </p>
               </>
@@ -545,19 +567,19 @@ export default async function DocumentViewPage({
         {/* tax summary by slab — required on a proper tax invoice */}
         {gstOn && totals.slabs.length > 0 && (
           <div className="print-avoid-break border-t border-[color:var(--doc-rule)]">
-            <p className="doc-eyebrow px-[0.9rem] pt-2">{t.taxSummary}</p>
+            <p className="doc-eyebrow px-[0.9rem] pt-2">{docLabels.taxSummary}</p>
             <div className="overflow-x-auto pt-1">
               <table className="doc-table doc-table-fixed">
                 <thead>
                   <tr>
                     <th>Rate</th>
-                    <th className="doc-num">{t.taxableValue} (₹)</th>
+                    <th className="doc-num">{docLabels.taxableValue} (₹)</th>
                     {totals.interState ? (
-                      <th className="doc-num">{t.igst} (₹)</th>
+                      <th className="doc-num">{docLabels.igst} (₹)</th>
                     ) : (
                       <>
-                        <th className="doc-num">{t.cgst} (₹)</th>
-                        <th className="doc-num">{t.sgst} (₹)</th>
+                        <th className="doc-num">{docLabels.cgst} (₹)</th>
+                        <th className="doc-num">{docLabels.sgst} (₹)</th>
                       </>
                     )}
                   </tr>
@@ -608,7 +630,7 @@ export default async function DocumentViewPage({
                         // The QR is generated on the server; nothing here is user input.
                         dangerouslySetInnerHTML={{ __html: qrSvg }}
                       />
-                      <p className="mt-1 text-[0.68rem] font-bold text-stone-700">{t.scanToPay}</p>
+                      <p className="mt-1 text-[0.68rem] font-bold text-stone-700">{docLabels.scanToPay}</p>
                     </div>
                   )}
                 </div>
@@ -626,12 +648,12 @@ export default async function DocumentViewPage({
 
           <div className="doc-cell text-right">
             <p className="text-[0.75rem] text-stone-600">
-              {t.signFor} <span className="font-extrabold text-ink">{profile?.business_name}</span>
+              {docLabels.signFor} <span className="font-extrabold text-ink">{profile?.business_name}</span>
             </p>
             <p className="doc-sign-line ml-auto inline-block px-8">Authorised Signature</p>
             {!isInvoice && (
               <p className="mt-4 text-left text-[0.7rem] text-stone-600">
-                {t.approvedBy}: ____________________ &nbsp; Date: __________
+                {docLabels.approvedBy}: ____________________ &nbsp; Date: __________
               </p>
             )}
           </div>

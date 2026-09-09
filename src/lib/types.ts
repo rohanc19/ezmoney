@@ -51,6 +51,18 @@ export const STATES: { code: string; name: string }[] = [
   { code: "18", name: "Assam" },
 ];
 
+/**
+ * The marks committed in public/brand. Anything whose path says "lockup"
+ * already contains the business name, so the header must not print the
+ * name twice.
+ */
+export const LOGO_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "No logo — business name as text" },
+  { value: "/brand/ce-lockup-horizontal.svg", label: "CE logo with name (best on bills)" },
+  { value: "/brand/ce-primary.svg", label: "CE mark only" },
+  { value: "/brand/ce-onecolour.svg", label: "CE mark, single ink (for photocopies)" },
+];
+
 export interface BusinessProfile {
   user_id: string;
   business_name: string;

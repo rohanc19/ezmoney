@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { checkScanner, logout, saveProfile, setLanguage } from "@/lib/actions";
 import { getDict, getLang } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
-import { STATES } from "@/lib/types";
+import { LOGO_OPTIONS, STATES } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -221,6 +221,34 @@ export default async function SettingsPage({
               />
             </div>
           </div>
+        </section>
+
+        {/* the mark at the top of every printed bill */}
+        <section className="card p-4">
+          <h2 className="font-extrabold">{t.logoSection}</h2>
+          <p className="mt-1 text-sm text-stone-500">{t.logoHint}</p>
+          <select
+            name="logo_url"
+            defaultValue={p?.logo_url ?? ""}
+            className="field mt-3"
+            aria-label={t.logoSection}
+          >
+            {LOGO_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {p?.logo_url && (
+            <div className="mt-3 rounded-xl border border-line bg-white p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.logo_url}
+                alt={p.business_name || "Logo"}
+                className="h-12 w-auto"
+              />
+            </div>
+          )}
         </section>
 
         {/* what he charges for the job itself */}

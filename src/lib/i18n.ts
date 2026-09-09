@@ -189,6 +189,8 @@ const dict = {
     orFixedAmount: "Or a fixed amount for the job (₹) — leave blank to use days × wage",
     labourThisYear: "Paid to labour this year",
     materialsAndOther: "Materials & other",
+    logoSection: "Logo on bills",
+    logoHint: "Shown at the top of every estimate and invoice you print.",
     // part-payments
     payments: "Payments",
     recordPayment: "Record a payment",
@@ -432,6 +434,8 @@ const dict = {
     orFixedAmount: "ಅಥವಾ ಕೆಲಸಕ್ಕೆ ಒಟ್ಟು ಮೊತ್ತ (₹) — ಖಾಲಿ ಬಿಟ್ಟರೆ ದಿನ × ಕೂಲಿ",
     labourThisYear: "ಈ ವರ್ಷ ಕೂಲಿಗೆ ಕೊಟ್ಟಿದ್ದು",
     materialsAndOther: "ಸಾಮಗ್ರಿ ಮತ್ತು ಇತರೆ",
+    logoSection: "ಬಿಲ್ ಮೇಲಿನ ಲೋಗೋ",
+    logoHint: "ಪ್ರತಿ ಎಸ್ಟಿಮೇಟ್ ಮತ್ತು ಬಿಲ್‌ನ ಮೇಲ್ಭಾಗದಲ್ಲಿ ತೋರಿಸುತ್ತದೆ.",
     payments: "ಪಾವತಿಗಳು",
     recordPayment: "ಪಾವತಿ ದಾಖಲಿಸಿ",
     amountReceived: "ಬಂದಿದ್ದು",
@@ -496,6 +500,40 @@ const dict = {
 };
 
 export type Dict = (typeof dict)["en"];
+
+/**
+ * Labels for the printed bill — deliberately NOT part of the dictionary.
+ *
+ * The app toggles to Kannada for him; the sheet that comes out of the
+ * printer goes to his client and their accountant, and a GST tax invoice
+ * is read in English whatever language the app is in. Reaching for `t.*`
+ * inside the printed document is what produced a half-translated invoice,
+ * so those labels live here instead where the choice is explicit.
+ */
+export const docLabels = {
+  hsn: "HSN/SAC",
+  subtotal: "Subtotal",
+  taxableValue: "Taxable value",
+  cgst: "CGST",
+  sgst: "SGST",
+  igst: "IGST",
+  total: "TOTAL",
+  received: "Received",
+  balanceDue: "Balance due",
+  fullySettled: "Fully paid",
+  taxSummary: "Tax summary",
+  scanToPay: "Scan to pay",
+  signFor: "For",
+  approvedBy: "Approved by (client)",
+  status: {
+    draft: "Draft",
+    sent: "Sent",
+    approved: "Approved",
+    rejected: "Rejected",
+    partly_paid: "Part paid",
+    paid: "Paid",
+  } as Record<string, string>,
+};
 
 export function getLang(): Lang {
   const c = cookies().get("lang")?.value;
