@@ -10,6 +10,20 @@ export function formatDate(iso: string | Date): string {
   return `${String(d.getDate()).padStart(2, "0")}-${MONTHS[d.getMonth()]}-${d.getFullYear()}`;
 }
 
+/** "Sep 2026" — the heading over a month's bills. */
+export function formatMonth(isoMonth: string): string {
+  const [y, m] = isoMonth.split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12) return isoMonth;
+  return `${MONTHS[m - 1]} ${y}`;
+}
+
+/** Whole days between two dates, for "unpaid for 47 days". */
+export function daysBetween(iso: string, from: Date = new Date()): number {
+  const then = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
+  if (isNaN(then.getTime())) return 0;
+  return Math.max(0, Math.floor((from.getTime() - then.getTime()) / 86400000));
+}
+
 /** today's date as yyyy-mm-dd for <input type=date> defaults (IST) */
 export function todayISO(): string {
   const now = new Date();

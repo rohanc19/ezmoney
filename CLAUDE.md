@@ -62,6 +62,7 @@ supabase/migrations/0002_v2.sql     GST columns, rate card, receipts bucket
 supabase/migrations/0003_v3.sql     labour book (workers + worker_entries), service charge
 supabase/migrations/0004_v4.sql     shop price book (shops + item_prices)
 supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
+supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anything looks wrong
 supabase/seed.sql                   demo data (attaches to first auth user)
 src/middleware.ts                   session refresh + login redirect
 src/lib/actions.ts                  every server action
@@ -113,6 +114,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   the standard-rate slab. Any place that recomputes totals — the print view
   included — has to pass `serviceCharge`, or the printed TOTAL will disagree
   with the stored one.
+- **A half-applied migration is worse than none.** 0005 once landed the
+  `payments` table without `documents.amount_received`, so every money query
+  errored and Home showed ₹0 with no error anywhere. `0006_catchup.sql` is
+  idempotent and ends with a check that must print "yes" on every column —
+  run it whenever the numbers look wrong before debugging any code.
 - **Paid is derived, never clicked.** `payments` rows are the source of truth;
   `documents.amount_received` is the persisted sum and `status` follows the money
   via `derivePaymentState` in `src/lib/payments.ts`. `setDocumentStatus` refuses
