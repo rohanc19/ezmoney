@@ -176,6 +176,12 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   when logged out — which once meant the login screen fetched its fonts and
   got HTML back, drawing the very tofu box `rupee-*.woff2` exists to prevent.
   Adding a new folder under `public/` means adding it to the matcher.
+- **Never use `window.confirm` for a destructive action.** Once Chrome shows
+  its "prevent this page from creating additional dialogs" checkbox and it is
+  ticked, `confirm()` returns false instantly without drawing anything — so
+  every delete in the app stops working silently, with nothing on screen to
+  explain it. `ConfirmButton` arms in place instead: first tap arms, second
+  submits, and it disarms itself after six seconds.
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.

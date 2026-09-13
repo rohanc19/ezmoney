@@ -135,6 +135,7 @@ export default async function RateCardPage({
                 <input type="hidden" name="id" value={i.id} />
                 <ConfirmButton
                   message={t.confirmDeleteRateItem}
+                      confirmLabel={t.tapAgain}
                   className="min-h-[44px] rounded-xl px-3 text-sm font-semibold text-red-700 active:bg-red-50"
                 >
                   × {t.delete}

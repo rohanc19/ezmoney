@@ -303,6 +303,7 @@ export default async function WorkerBookPage({
                       <input type="hidden" name="worker_id" value={worker.id} />
                       <ConfirmButton
                         message={t.confirmDeleteEntry}
+                      confirmLabel={t.tapAgain}
                         className="mt-1 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                       >
                         × {t.delete}
@@ -318,7 +319,8 @@ export default async function WorkerBookPage({
 
       <form action={deleteWorker} className="mt-8">
         <input type="hidden" name="id" value={worker.id} />
-        <ConfirmButton message={t.confirmDeleteWorker} className="btn-danger w-full">
+        <ConfirmButton message={t.confirmDeleteWorker}
+                      confirmLabel={t.tapAgain} className="btn-danger w-full">
           {t.delete}
         </ConfirmButton>
       </form>

@@ -217,7 +217,8 @@ export default async function ClientLedgerPage({
       {/* Only possible while nothing points at them — see deleteClient. */}
       <form action={deleteClient} className="mt-8">
         <input type="hidden" name="id" value={client.id} />
-        <ConfirmButton message={t.confirmDeleteClient} className="btn-danger w-full">
+        <ConfirmButton message={t.confirmDeleteClient}
+                      confirmLabel={t.tapAgain} className="btn-danger w-full">
           {t.deleteClient}
         </ConfirmButton>
       </form>

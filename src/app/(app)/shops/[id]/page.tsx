@@ -156,6 +156,7 @@ export default async function ShopPage({
                     <input type="hidden" name="shop_id" value={shop.id} />
                     <ConfirmButton
                       message={t.confirmDeletePrice}
+                      confirmLabel={t.tapAgain}
                       className="mt-1 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                     >
                       × {t.delete}
@@ -170,7 +171,8 @@ export default async function ShopPage({
 
       <form action={deleteShop} className="mt-8">
         <input type="hidden" name="id" value={shop.id} />
-        <ConfirmButton message={t.confirmDeleteShop} className="btn-danger w-full">
+        <ConfirmButton message={t.confirmDeleteShop}
+                      confirmLabel={t.tapAgain} className="btn-danger w-full">
           {t.delete}
         </ConfirmButton>
       </form>

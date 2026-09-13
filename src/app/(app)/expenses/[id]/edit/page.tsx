@@ -43,7 +43,8 @@ export default async function EditExpensePage({ params }: { params: { id: string
       <form action={deleteExpense} className="mt-6">
         <input type="hidden" name="id" value={expense.id} />
         <input type="hidden" name="receipt_path" value={expense.receipt_path ?? ""} />
-        <ConfirmButton message={t.confirmDeleteExpense} className="btn-danger w-full">
+        <ConfirmButton message={t.confirmDeleteExpense}
+                      confirmLabel={t.tapAgain} className="btn-danger w-full">
           {t.delete}
         </ConfirmButton>
       </form>

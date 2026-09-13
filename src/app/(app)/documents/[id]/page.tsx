@@ -249,7 +249,8 @@ export default async function DocumentViewPage({
 
             <form action={deleteDocument}>
               <input type="hidden" name="id" value={doc.id} />
-              <ConfirmButton message={t.confirmDeleteDoc} className="btn-danger">
+              <ConfirmButton message={t.confirmDeleteDoc}
+                      confirmLabel={t.tapAgain} className="btn-danger">
                 {t.delete}
               </ConfirmButton>
             </form>
@@ -374,6 +375,7 @@ export default async function DocumentViewPage({
                         <input type="hidden" name="document_id" value={doc.id} />
                         <ConfirmButton
                           message={t.confirmDeletePayment}
+                      confirmLabel={t.tapAgain}
                           className="mt-0.5 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
                         >
                           × {t.delete}
