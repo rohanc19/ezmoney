@@ -1045,3 +1045,93 @@ export async function deletePayment(formData: FormData) {
   revalidatePath("/");
   redirect(`/documents/${document_id}`);
 }
+
+// ---------- the working week ----------
+
+/**
+ * Tap a day to say he worked it, tap again to take it back.
+ *
+ * His men are on a daily wage and settle on Saturday, so a week is six
+ * taps rather than six trips through a form. Taking a day back only
+ * works when that day holds a single ordinary day's work — anything
+ * longer, or a lump sum, is left alone and edited in the book below,
+ * because silently deleting a ₹25,000 lump would be unforgivable.
+ */
+export async function toggleWorkDay(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const worker_id = String(formData.get("worker_id") ?? "");
+  const day = String(formData.get("day") ?? "");
+  const week = String(formData.get("week") ?? "");
+  if (!worker_id || !day) redirect("/labour");
+
+  const back = `/labour/${worker_id}${week ? `?week=${week}` : ""}`;
+
+  const [{ data: worker }, { data: existing }] = await Promise.all([
+    supabase
+      .from("workers")
+      .select("daily_rate")
+      .eq("id", worker_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("worker_entries")
+      .select("id, days, amount")
+      .eq("worker_id", worker_id)
+      .eq("user_id", user.id)
+      .eq("kind", "work")
+      .eq("entry_date", day),
+  ]);
+  if (!worker) redirect("/labour");
+
+  const rows = existing ?? [];
+  if (rows.length === 0) {
+    const rate = Number(worker.daily_rate) || 0;
+    if (rate <= 0) redirect(back); // no wage set yet — nothing to record
+    const { error } = await supabase.from("worker_entries").insert({
+      user_id: user.id,
+      worker_id,
+      entry_date: day,
+      kind: "work",
+      days: 1,
+      rate,
+      amount: rate,
+    });
+    if (error) throw error;
+  } else if (rows.length === 1 && Number(rows[0].days) <= 1) {
+    const { error } = await supabase
+      .from("worker_entries")
+      .delete()
+      .eq("id", rows[0].id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+  }
+
+  revalidatePath(`/labour/${worker_id}`);
+  revalidatePath("/labour");
+  redirect(back);
+}
+
+/** Settle the week: one payment for what is left after any advances. */
+export async function payWeek(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const worker_id = String(formData.get("worker_id") ?? "");
+  const amount = Number(formData.get("amount")) || 0;
+  const paid_on = String(formData.get("paid_on") ?? "");
+  const week = String(formData.get("week") ?? "");
+  if (!worker_id || amount <= 0) redirect(`/labour/${worker_id}`);
+
+  const { error } = await supabase.from("worker_entries").insert({
+    user_id: user.id,
+    worker_id,
+    entry_date: paid_on || new Date().toISOString().slice(0, 10),
+    kind: "payment",
+    amount: round2(amount),
+    paid_via: "Cash",
+    notes: week ? `Week of ${week}` : "",
+  });
+  if (error) throw error;
+
+  revalidatePath(`/labour/${worker_id}`);
+  revalidatePath("/labour");
+  redirect(`/labour/${worker_id}?saved=1${week ? `&week=${week}` : ""}`);
+}

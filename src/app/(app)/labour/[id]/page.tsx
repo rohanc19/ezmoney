@@ -1,8 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
-import { deleteWorker, deleteWorkerEntry, saveWorkerEntry } from "@/lib/actions";
-import { formatDate, formatINR, todayISO } from "@/lib/format";
+import {
+  deleteWorker,
+  deleteWorkerEntry,
+  payWeek,
+  saveWorkerEntry,
+  toggleWorkDay,
+} from "@/lib/actions";
+import {
+  addDays,
+  formatDate,
+  formatDayShort,
+  formatINR,
+  mondayOf,
+  todayISO,
+} from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
 import { PAID_VIA, type WorkerEntry } from "@/lib/types";
@@ -20,7 +33,7 @@ export default async function WorkerBookPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { saved?: string };
+  searchParams: { saved?: string; week?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
@@ -46,6 +59,34 @@ export default async function WorkerBookPage({
     .filter((e) => e.kind !== "work")
     .reduce((s, e) => s + Number(e.amount), 0);
   const balance = earned - paid;
+
+  // ---- the working week: Monday to Sunday, settled on Saturday ----
+  const weekStart = mondayOf(searchParams.week || today);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const saturday = weekDays[5];
+
+  const inWeek = entries.filter(
+    (e) => e.entry_date >= weekDays[0] && e.entry_date <= weekDays[6]
+  );
+  const dayTotals = weekDays.map((d) => {
+    const rows = inWeek.filter((e) => e.kind === "work" && e.entry_date === d);
+    return {
+      date: d,
+      days: rows.reduce((s2, r) => s2 + Number(r.days), 0),
+      amount: rows.reduce((s2, r) => s2 + Number(r.amount), 0),
+      count: rows.length,
+    };
+  });
+  const weekEarned = dayTotals.reduce((s2, d) => s2 + d.amount, 0);
+  const weekDaysWorked = dayTotals.reduce((s2, d) => s2 + d.days, 0);
+  const weekAdvance = inWeek
+    .filter((e) => e.kind === "advance")
+    .reduce((s2, e) => s2 + Number(e.amount), 0);
+  const weekPaid = inWeek
+    .filter((e) => e.kind === "payment")
+    .reduce((s2, e) => s2 + Number(e.amount), 0);
+  const weekDue = Math.round((weekEarned - weekAdvance - weekPaid) * 100) / 100;
+  const hasWage = Number(worker.daily_rate) > 0;
 
   const wa = worker.phone ? waLink(worker.phone) : null;
   const kindLabel: Record<string, string> = {
@@ -74,7 +115,7 @@ export default async function WorkerBookPage({
         <p className="font-semibold text-stone-700">
           {worker.skill}
           {Number(worker.daily_rate) > 0
-            ? ` · ${formatINR(Number(worker.daily_rate), 0)} / ${t.days.toLowerCase()}`
+            ? ` · ${formatINR(Number(worker.daily_rate), 0)} ${t.perDay}`
             : ""}
         </p>
         {worker.phone && <p className="text-stone-700">{worker.phone}</p>}
@@ -96,6 +137,114 @@ export default async function WorkerBookPage({
           )}
         </div>
       </div>
+
+      {/* ---- the week: tap the days, settle on Saturday ---- */}
+      <section className="card mt-4 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href={`/labour/${worker.id}?week=${addDays(weekStart, -7)}`}
+            aria-label={t.prevWeek}
+            className="min-h-[40px] px-2 text-xl font-bold text-stone-500"
+          >
+            ‹
+          </Link>
+          <p className="text-center text-sm font-extrabold">
+            {weekStart === mondayOf(today)
+              ? t.thisWeek
+              : `${t.weekOf} ${formatDayShort(weekStart)}`}
+            <span className="ml-1 font-semibold text-stone-500">
+              {formatDayShort(weekDays[0])} – {formatDayShort(weekDays[6])}
+            </span>
+          </p>
+          <Link
+            href={`/labour/${worker.id}?week=${addDays(weekStart, 7)}`}
+            aria-label={t.nextWeek}
+            className="min-h-[40px] px-2 text-xl font-bold text-stone-500"
+          >
+            ›
+          </Link>
+        </div>
+
+        {!hasWage ? (
+          <p className="mt-3 text-center text-sm text-stone-500">{t.setWageFirst}</p>
+        ) : (
+          <>
+            <div className="mt-3 grid grid-cols-7 gap-1">
+              {dayTotals.map((d, i) => (
+                <form key={d.date} action={toggleWorkDay}>
+                  <input type="hidden" name="worker_id" value={worker.id} />
+                  <input type="hidden" name="day" value={d.date} />
+                  <input type="hidden" name="week" value={weekStart} />
+                  <button
+                    type="submit"
+                    className={`flex min-h-[58px] w-full flex-col items-center justify-center rounded-xl border-2 px-0.5 ${
+                      d.days > 0
+                        ? "border-accent bg-accent text-white"
+                        : "border-line bg-white text-stone-500"
+                    }`}
+                  >
+                    <span className="text-[0.62rem] font-bold uppercase">{t.daysShort[i]}</span>
+                    <span className="text-[0.68rem]">{formatDayShort(d.date).split(" ")[0]}</span>
+                    {d.days > 0 && (
+                      <span className="tnum text-[0.6rem] font-bold">
+                        {d.days === 1 ? "✓" : d.days}
+                      </span>
+                    )}
+                  </button>
+                </form>
+              ))}
+            </div>
+            <p className="mt-1.5 text-center text-xs text-stone-500">{t.tapDaysHint}</p>
+
+            <dl className="mt-3 border-t border-line pt-2">
+              <div className="flex justify-between py-0.5 text-sm">
+                <dt className="text-stone-600">
+                  {t.workedDays} · {weekDaysWorked}
+                </dt>
+                <dd className="tnum font-semibold">{formatINR(weekEarned, 0)}</dd>
+              </div>
+              {weekAdvance > 0 && (
+                <div className="flex justify-between py-0.5 text-sm">
+                  <dt className="text-stone-600">{t.advanceTaken}</dt>
+                  <dd className="tnum font-semibold text-amber-700">
+                    − {formatINR(weekAdvance, 0)}
+                  </dd>
+                </div>
+              )}
+              {weekPaid > 0 && (
+                <div className="flex justify-between py-0.5 text-sm">
+                  <dt className="text-stone-600">{t.paidOut}</dt>
+                  <dd className="tnum font-semibold text-green-800">
+                    − {formatINR(weekPaid, 0)}
+                  </dd>
+                </div>
+              )}
+              <div className="mt-1 flex justify-between border-t border-line pt-2">
+                <dt className="font-bold">{t.toPaySaturday}</dt>
+                <dd
+                  className={`tnum text-xl font-extrabold ${
+                    weekDue > 0 ? "text-amber-700" : "text-stone-800"
+                  }`}
+                >
+                  {formatINR(weekDue, 0)}
+                </dd>
+              </div>
+            </dl>
+
+            {weekDue > 0 && (
+              <form action={payWeek} className="mt-3">
+                <input type="hidden" name="worker_id" value={worker.id} />
+                <input type="hidden" name="amount" value={weekDue} />
+                <input type="hidden" name="paid_on" value={saturday} />
+                <input type="hidden" name="week" value={formatDate(weekStart)} />
+                <button type="submit" className="btn-primary w-full">
+                  {t.payNow} {formatINR(weekDue, 0)}
+                </button>
+              </form>
+            )}
+          </>
+        )}
+      </section>
 
       {/* the numbers */}
       <div className="mt-4 grid grid-cols-3 gap-2">
@@ -278,7 +427,11 @@ export default async function WorkerBookPage({
                     <span className="mt-1 block text-sm text-stone-500">
                       {formatDate(e.entry_date)}
                       {isWork && Number(e.days) > 0
-                        ? ` · ${e.days} ${t.days.toLowerCase()} × ${formatINR(Number(e.rate), 0)}`
+                        ? ` · ${
+                            Number(e.days) === 1
+                              ? t.oneDay
+                              : `${e.days} ${t.days.toLowerCase()}`
+                          } × ${formatINR(Number(e.rate), 0)}`
                         : ""}
                       {!isWork ? ` · ${e.paid_via}` : ""}
                     </span>

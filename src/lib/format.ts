@@ -10,6 +10,46 @@ export function formatDate(iso: string | Date): string {
   return `${String(d.getDate()).padStart(2, "0")}-${MONTHS[d.getMonth()]}-${d.getFullYear()}`;
 }
 
+/**
+ * yyyy-mm-dd from a Date, read in local time.
+ *
+ * Never use toISOString() for a calendar date: it converts to UTC, and
+ * midnight in Bangalore is half past six the previous evening in UTC, so
+ * every date silently moves back a day. That is how a Monday became a
+ * Sunday and a day of work landed outside the week it belonged to.
+ */
+function localISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** The Monday on or before a date. Site weeks run Monday to Saturday and
+ *  the men are paid on Saturday. */
+export function mondayOf(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  const shift = (d.getDay() + 6) % 7; // Sunday closes the week, not opens it
+  d.setDate(d.getDate() - shift);
+  return localISO(d);
+}
+
+/** n days after an iso date, as yyyy-mm-dd. */
+export function addDays(iso: string, n: number): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + n);
+  return localISO(d);
+}
+
+/** "8 Sep" — compact, for a row of seven days. */
+export function formatDayShort(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 /** "Sep 2026" — the heading over a month's bills. */
 export function formatMonth(isoMonth: string): string {
   const [y, m] = isoMonth.split("-").map(Number);
