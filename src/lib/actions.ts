@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { computeServiceCharge, computeTotals } from "@/lib/gst";
 import { derivePaymentState, round2, sumPayments } from "@/lib/payments";
 import { itemKey } from "@/lib/prices";
+import { suggest } from "@/lib/spelling";
 import { supabaseServer } from "@/lib/supabase/server";
 import { STATES } from "@/lib/types";
 
@@ -476,6 +477,49 @@ export async function saveRateCardItem(formData: FormData) {
   }
   revalidatePath("/rate-card");
   redirect("/rate-card?saved=1");
+}
+
+/**
+ * Accept one proposed spelling on a saved item. The corrected text comes
+ * from `suggest` on the server, not from the page, so a stale tab cannot
+ * write something the current dictionary would not propose.
+ */
+export async function fixRateCardSpelling(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/rate-card?fix=1");
+
+  const { data: item } = await supabase
+    .from("rate_card_items")
+    .select("description")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const fixed = item ? suggest(item.description) : null;
+  if (!fixed) redirect("/rate-card?fix=1");
+
+  const { error } = await supabase
+    .from("rate_card_items")
+    .update({ description: fixed })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  // The list is unique on (user_id, description). If he already has the
+  // correctly spelled item saved, the corrected row is that same item
+  // twice, so drop this one. Only a real collision gets here — the
+  // database decides, not a looser comparison of our own, which would
+  // delete rows that were never going to clash.
+  if (error) {
+    if (error.code !== "23505") throw error;
+    const { error: delError } = await supabase
+      .from("rate_card_items")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (delError) throw delError;
+  }
+  revalidatePath("/rate-card");
+  redirect("/rate-card?fix=1");
 }
 
 export async function deleteRateCardItem(formData: FormData) {

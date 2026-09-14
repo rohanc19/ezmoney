@@ -19,9 +19,11 @@ option that is simpler for him, not the one that is more capable.
   fetching frameworks. Check the bundle line in `next build` output before shipping.
   Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
   and expense forms (the three client components — DocumentForm, ScanSheet,
-  RatePicker); the bill form went to 103 kB when the due date was added.
-  That is the ceiling; anything that pushes a route past ~105 kB needs a
-  reason.
+  RatePicker); the bill form is at 105 kB — the due date took it to 103,
+  the spelling dictionary to 105. That is the ceiling; anything past
+  ~105 kB needs a reason. The lever if it ever has to come down is
+  `PHRASES` in `src/lib/spelling.ts`, which only the rate-card cleanup
+  really needs and which could move to a server-only module.
 - **What actually costs him is paint, not bytes.** The machine renders in
   software more often than not. So: no `backdrop-filter` (it re-blurs the
   backdrop every scroll frame — it was on the nav and the total bar, and both
@@ -82,6 +84,7 @@ src/lib/upi.ts                      UPI intent string + server-rendered QR
 src/lib/payments.ts                 part-payment sums and the derived bill status
 src/lib/share.ts                    the mailto: body for a bill
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
+src/lib/spelling.ts                 proposed spelling fixes for what gets printed
 src/lib/summary.ts                  days-to-settle, job-size buckets, month series
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
@@ -252,6 +255,28 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   so the box around it must size the SVG (`.doc-qr > svg { width: 100% }`)
   rather than just clipping it — an undersized box printed "Scan to pay"
   across the code itself.
+- **Spelling is proposed, never applied.** Two years of his bills carry
+  the same slips — "colar", "modal", "Grue", "Labor", "Cealing" — and they
+  print in the widest column of the customer's copy. `suggest` in
+  `src/lib/spelling.ts` returns a tidier string or null; the bill form
+  offers it under the description and Site/Job, and My Items & Rates
+  offers it per row behind `?fix=1`. Nothing is ever rewritten without a
+  tap, and `fixRateCardSpelling` recomputes the correction on the server
+  so a stale tab cannot write something the dictionary would not propose.
+- **His trade's words are not spelling mistakes.** Gatta, patti, potted,
+  niles, checkey, swg, lisha and Roma are words on a Bangalore electrical
+  bill. `TRADE_WORDS` in `src/lib/spelling.ts` holds them and every rule
+  skips them — "correcting" one of those makes the bill worse than the
+  typo did. Only add a word to the dictionary you are sure about; the
+  stray "T" in "15 W L E D T Bulb" and the "Mass Pet" in "U P S Mass Pet
+  Circuit Board" are left alone on purpose.
+- **A run of single letters is not always an acronym.** "15 W L E D
+  Bulb" joined blindly becomes "WLED" — the W is a unit. `SPACED_ACRONYMS`
+  is therefore an explicit list, not a pattern.
+- **`rate_card_items` is unique on (user_id, description), case
+  sensitively.** So the spelling fix updates first and merges only when
+  Postgres actually returns 23505 — a looser comparison of our own
+  (`ilike`) would delete rows that were never going to clash.
 - **The bill renders twice.** `.doc-lines` (blocks) below 640px, and
   `.doc-table-wrap` (the ruled table) at 640px and up *and in print* — the
   table pushed the Amount column off a phone screen behind a scrollbar.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ConfirmButton from "@/components/ConfirmButton";
-import { deleteRateCardItem, saveRateCardItem } from "@/lib/actions";
+import { deleteRateCardItem, fixRateCardSpelling, saveRateCardItem } from "@/lib/actions";
+import { suggest } from "@/lib/spelling";
 import { formatINR } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function RateCardPage({
   searchParams,
 }: {
-  searchParams: { saved?: string };
+  searchParams: { saved?: string; fix?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
@@ -24,6 +25,14 @@ export default async function RateCardPage({
     supabase.from("business_profile").select("gst_enabled, default_hsn_sac").maybeSingle(),
   ]);
 
+  // What looks misspelled. Proposed only — nothing changes until he taps.
+  const all = items ?? [];
+  const withFix = all
+    .map((i) => ({ item: i, fixed: suggest(i.description) }))
+    .filter((r): r is { item: (typeof all)[number]; fixed: string } => r.fixed !== null);
+  const fixing = searchParams.fix === "1";
+  const listed = fixing ? withFix.map((r) => r.item) : all;
+
   return (
     <main>
       <div className="mb-4 flex items-center gap-3">
@@ -34,6 +43,30 @@ export default async function RateCardPage({
       </div>
       <p className="text-stone-600">{t.rateCardHint}</p>
 
+      {/* Spelling. These print in the biggest column of his customer's
+          copy, so they are worth a look — but only ever on his say-so. */}
+      {withFix.length > 0 && !fixing && (
+        <Link
+          href="/rate-card?fix=1"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 p-3 font-semibold text-amber-900 no-underline"
+        >
+          <span>{t.spellingToCheck.replace("{n}", String(withFix.length))}</span>
+          <span className="shrink-0 underline">{t.checkSpellings} →</span>
+        </Link>
+      )}
+      {fixing && (
+        <div className="mt-4 rounded-2xl bg-amber-50 p-3">
+          <p className="font-semibold text-amber-900">
+            {withFix.length > 0
+              ? t.spellingToCheck.replace("{n}", String(withFix.length))
+              : t.spellingAllGood}
+          </p>
+          <Link href="/rate-card" className="text-sm font-semibold text-amber-900 underline">
+            ← {t.backToAll}
+          </Link>
+        </div>
+      )}
+
       {searchParams.saved && (
         <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
@@ -41,7 +74,10 @@ export default async function RateCardPage({
       )}
 
       {/* add */}
-      <form action={saveRateCardItem} className="card mt-5 space-y-4 p-4">
+      <form
+        action={saveRateCardItem}
+        className={`card mt-5 space-y-4 p-4 ${fixing ? "hidden" : ""}`}
+      >
         <div>
           <label className="label" htmlFor="description">
             {t.description}
@@ -86,12 +122,29 @@ export default async function RateCardPage({
       </form>
 
       {/* list */}
-      {(items ?? []).length === 0 ? (
-        <p className="card mt-5 p-6 text-center text-stone-600">{t.noRateItems}</p>
+      {listed.length === 0 ? (
+        <p className="card mt-5 p-6 text-center text-stone-600">
+          {fixing ? t.spellingAllGood : t.noRateItems}
+        </p>
       ) : (
         <ul className="mt-5 space-y-3">
-          {(items ?? []).map((i) => (
+          {listed.map((i) => (
             <li key={i.id} className="card p-4">
+              {(() => {
+                const fixed = suggest(i.description);
+                if (!fixed) return null;
+                return (
+                  <form action={fixRateCardSpelling} className="mb-3">
+                    <input type="hidden" name="id" value={i.id} />
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-amber-100 px-3 py-2 text-left text-sm font-semibold text-amber-900"
+                    >
+                      {t.changeTo} <span className="font-extrabold">{fixed}</span>
+                    </button>
+                  </form>
+                );
+              })()}
               <form action={saveRateCardItem} className="space-y-3">
                 <input type="hidden" name="id" value={i.id} />
                 <input

@@ -6,6 +6,7 @@ import ScanSheet from "@/components/ScanSheet";
 import { formatDate, formatINR } from "@/lib/format";
 import type { Dict } from "@/lib/i18n";
 import { matchesQuery } from "@/lib/prices";
+import { suggest } from "@/lib/spelling";
 import type { OwnRate } from "@/lib/queries";
 import {
   STATES,
@@ -387,6 +388,19 @@ export default function DocumentForm({
           onChange={(e) => setSiteJob(e.target.value)}
           className="field"
         />
+        {(() => {
+          const fixed = suggest(siteJob);
+          if (!fixed) return null;
+          return (
+            <button
+              type="button"
+              onClick={() => setSiteJob(fixed)}
+              className="mt-1.5 block min-h-[32px] text-left text-xs leading-snug text-accent"
+            >
+              {t.didYouMean} <span className="font-bold underline">{fixed}</span>
+            </button>
+          );
+        })()}
       </div>
 
       {/* line items */}
@@ -429,6 +443,21 @@ export default function DocumentForm({
                 list="recent-descriptions"
                 className="field"
               />
+              {(() => {
+                // Proposed, never applied: what he typed is what gets saved
+                // unless he taps. See src/lib/spelling.ts.
+                const fixed = suggest(item.description);
+                if (!fixed) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => update(idx, { description: fixed })}
+                    className="mt-1.5 block min-h-[32px] text-left text-xs leading-snug text-accent"
+                  >
+                    {t.didYouMean} <span className="font-bold underline">{fixed}</span>
+                  </button>
+                );
+              })()}
               {(() => {
                 const own = findOwnRate(item.description);
                 if (!own) return null;
