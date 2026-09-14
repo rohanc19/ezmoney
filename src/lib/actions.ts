@@ -430,6 +430,12 @@ async function learnRateCard(
         rate: i.rate,
         // A bill without an HSN typed must not wipe the one already saved.
         hsn_sac: i.hsn_sac || prev?.hsn || "",
+        // The column defaults to 'Work', which filed every wire and pipe
+        // he ever billed as labour. Almost everything on a bill is a
+        // thing he bought; only the labour lines are work.
+        category: /labou?r|service|charges|wages|installation|instalation/i.test(name)
+          ? "Work"
+          : "Material",
         times_used: (prev?.times ?? 0) + 1,
         last_used_at: now,
       };

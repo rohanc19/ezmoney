@@ -28,6 +28,13 @@ export default function RatePicker({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Record<string, boolean>>({});
+  // The same three-chip filter as Home, so it is a shape he already knows.
+  const [kind, setKind] = useState<"" | "Work" | "Material">("");
+
+  const inKind = useMemo(
+    () => (kind ? items.filter((i) => i.category === kind) : items),
+    [items, kind]
+  );
 
   // Searching goes through the same forgiving match the bill form uses,
   // so "bend 3/4" and "3/4 inch bend" both find the same thing — which
@@ -35,29 +42,29 @@ export default function RatePicker({
   const results = useMemo(() => {
     const needle = q.trim();
     if (!needle) return null;
-    return items.filter(
+    return inKind.filter(
       (i) =>
         matchesQuery(itemKey(i.description), needle) ||
         i.description.toLowerCase().includes(needle.toLowerCase())
     );
-  }, [items, q]);
+  }, [inKind, q]);
 
   // Only things he has actually reached for more than once. Most of his
   // two hundred items have been billed a single time, and ranking those
   // against each other just produces a random-looking top eight.
   const mostUsed = useMemo(() => {
-    const repeat = items.filter((i) => i.times_used >= 2);
+    const repeat = inKind.filter((i) => i.times_used >= 2);
     if (repeat.length < 3) return [];
-    return repeat.sort((a, b) => b.times_used - a.times_used).slice(0, MOST_USED);
-  }, [items]);
+    return [...repeat].sort((a, b) => b.times_used - a.times_used).slice(0, MOST_USED);
+  }, [inKind]);
   const mostUsedIds = new Set(mostUsed.map((i) => i.id));
   const rest = useMemo(
     () =>
-      [...items]
+      [...inKind]
         .filter((i) => !mostUsedIds.has(i.id))
         .sort((a, b) => a.description.localeCompare(b.description)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items]
+    [inKind, mostUsed]
   );
 
   const chosen = items.filter((i) => picked[i.id]);
@@ -65,6 +72,7 @@ export default function RatePicker({
   const close = () => {
     setOpen(false);
     setQ("");
+    setKind("");
     setPicked({});
   };
 
@@ -113,7 +121,7 @@ export default function RatePicker({
               <h2 className="text-lg font-extrabold">
                 {t.rateCardShort}{" "}
                 <span className="text-sm font-semibold text-stone-500">
-                  {t.itemsCount.replace("{n}", String(items.length))}
+                  {t.itemsCount.replace("{n}", String(inKind.length))}
                 </span>
               </h2>
               <button type="button" className="btn-ghost px-3" onClick={close}>
@@ -127,6 +135,29 @@ export default function RatePicker({
               placeholder={t.searchItems}
               className="field"
             />
+
+            <div className="mt-2 flex gap-2">
+              {(
+                [
+                  ["", t.all],
+                  ["Work", t.workItems],
+                  ["Material", t.materialItems],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value || "all"}
+                  type="button"
+                  onClick={() => setKind(value)}
+                  className={`btn flex-1 text-sm ${
+                    kind === value
+                      ? "bg-accent text-white"
+                      : "border-2 border-line bg-white text-stone-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto pb-2">
