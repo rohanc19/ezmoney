@@ -1127,3 +1127,152 @@ export async function payWeek(formData: FormData) {
   revalidatePath("/labour");
   redirect(`/labour/${worker_id}?saved=1${week ? `&week=${week}` : ""}`);
 }
+
+// ---------- shop checklists ----------
+
+/** Copy a section template into a fresh list he can put quantities on. */
+export async function createFromTemplate(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const template_id = String(formData.get("template_id") ?? "");
+  if (!template_id) redirect("/checklists");
+
+  const [{ data: template }, { data: items }] = await Promise.all([
+    supabase
+      .from("checklists")
+      .select("name")
+      .eq("id", template_id)
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("checklist_items")
+      .select("description, unit, position")
+      .eq("checklist_id", template_id)
+      .order("position"),
+  ]);
+  if (!template) redirect("/checklists");
+
+  const { data: list, error } = await supabase
+    .from("checklists")
+    .insert({
+      user_id: user.id,
+      name: template.name,
+      is_template: false,
+      client_id: String(formData.get("client_id") ?? "") || null,
+      site_job: String(formData.get("site_job") ?? "").trim(),
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  if (items && items.length > 0) {
+    const { error: e2 } = await supabase.from("checklist_items").insert(
+      items.map((i) => ({
+        user_id: user.id,
+        checklist_id: list.id,
+        description: i.description,
+        unit: i.unit,
+        qty: 0,
+        by_client: false,
+        position: i.position,
+      }))
+    );
+    if (e2) throw e2;
+  }
+
+  revalidatePath("/checklists");
+  redirect(`/checklists/${list.id}`);
+}
+
+/**
+ * One save for the whole list: a quantity per row, and a tick on the rows
+ * the client is buying himself. Rows left at zero are simply not wanted
+ * this time — they stay on the list so he can see what he decided against.
+ */
+export async function saveChecklist(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/checklists");
+
+  const { error } = await supabase
+    .from("checklists")
+    .update({
+      name: String(formData.get("name") ?? "").trim() || "List",
+      client_id: String(formData.get("client_id") ?? "") || null,
+      site_job: String(formData.get("site_job") ?? "").trim(),
+      list_date: String(formData.get("list_date") ?? "") || new Date().toISOString().slice(0, 10),
+      notes: String(formData.get("notes") ?? "").trim(),
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw error;
+
+  // Every row comes back as qty_<id> and, when ticked, client_<id>.
+  const updates: { id: string; qty: number; by_client: boolean }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("qty_")) continue;
+    const itemId = key.slice(4);
+    updates.push({
+      id: itemId,
+      qty: Math.max(0, Number(value) || 0),
+      by_client: formData.get(`client_${itemId}`) === "on",
+    });
+  }
+  for (const u of updates) {
+    await supabase
+      .from("checklist_items")
+      .update({ qty: u.qty, by_client: u.by_client })
+      .eq("id", u.id)
+      .eq("user_id", user.id);
+  }
+
+  revalidatePath(`/checklists/${id}`);
+  redirect(`/checklists/${id}?saved=1`);
+}
+
+/** A one-off item the template did not know about. */
+export async function addChecklistItem(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const checklist_id = String(formData.get("checklist_id") ?? "");
+  const description = String(formData.get("description") ?? "").trim();
+  if (!checklist_id || !description) redirect(`/checklists/${checklist_id}`);
+
+  const { count } = await supabase
+    .from("checklist_items")
+    .select("id", { count: "exact", head: true })
+    .eq("checklist_id", checklist_id);
+
+  const { error } = await supabase.from("checklist_items").insert({
+    user_id: user.id,
+    checklist_id,
+    description,
+    unit: String(formData.get("unit") ?? "Nos"),
+    qty: Number(formData.get("qty")) || 0,
+    position: (count ?? 0) + 1,
+  });
+  if (error) throw error;
+  revalidatePath(`/checklists/${checklist_id}`);
+  redirect(`/checklists/${checklist_id}?saved=1`);
+}
+
+export async function deleteChecklistItem(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const checklist_id = String(formData.get("checklist_id") ?? "");
+  const { error } = await supabase
+    .from("checklist_items")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath(`/checklists/${checklist_id}`);
+  redirect(`/checklists/${checklist_id}`);
+}
+
+export async function deleteChecklist(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const { error } = await supabase.from("checklists").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw error;
+  revalidatePath("/checklists");
+  redirect("/checklists");
+}

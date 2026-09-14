@@ -69,6 +69,8 @@ supabase/migrations/0004_v4.sql     shop price book (shops + item_prices)
 supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
 supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anything looks wrong
 supabase/migrations/0007_sections.sql line_items.section — parts of a job
+supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist_items)
+supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
 src/middleware.ts                   session refresh + login redirect
@@ -198,6 +200,14 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **Sharing is what marks a bill sent.** Save as PDF, WhatsApp and Gmail all
   call `markSentIfDraft`; there is no chore to remember. Ten bills in, every
   one of them was still a draft.
+- **A checklist and a template are the same table.** Before a job he writes
+  the materials for a section and hands the list to a shop, who tick down it
+  and give him an invoice. A section template is a `checklists` row with
+  `is_template`, quantities blank; making a list copies its rows. Only the
+  quantities change job to job, which is why the list screen is a quantity
+  box per row and nothing else. `by_client` marks the lines the client buys
+  himself — those print with a CLIENT badge and no tick box, so the shop
+  knows not to supply them. Rows left at zero never reach the shop copy.
 - **A bill can be split into named parts, and usually is not.** His big
   estimates are staged — Internal Wiring, Underground Cable, Meter Panal,
   BESCOM Charges — each with its own items, its own labour line and its own

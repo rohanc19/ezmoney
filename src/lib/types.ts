@@ -188,6 +188,28 @@ export interface Expense {
   receipt_path: string | null;
 }
 
+export interface Checklist {
+  id: string;
+  name: string;
+  is_template: boolean;
+  client_id: string | null;
+  site_job: string;
+  list_date: string;
+  notes: string;
+  clients?: { name: string } | null;
+}
+
+export interface ChecklistItem {
+  id: string;
+  checklist_id: string;
+  description: string;
+  unit: string;
+  qty: number;
+  /** The client buys this one, so the shop should not supply it. */
+  by_client: boolean;
+  position: number;
+}
+
 export interface Worker {
   id: string;
   name: string;
