@@ -196,6 +196,11 @@ const dict = {
     materialsAndOther: "Materials & other",
     // the working week — day wise, settled on Saturday
     perDay: "a day",
+    whatColumn: "What",
+    detailsColumn: "Details",
+    addSomethingElse: "Advance",
+    addPaymentShort: "Payment",
+    dayTotals: "Day",
     // one worker, one day
     workedThisDay: "Worked this day",
     otherAmount: "Half day, overtime or a fixed amount",
@@ -542,6 +547,11 @@ const dict = {
     labourThisYear: "ಈ ವರ್ಷ ಕೂಲಿಗೆ ಕೊಟ್ಟಿದ್ದು",
     materialsAndOther: "ಸಾಮಗ್ರಿ ಮತ್ತು ಇತರೆ",
     perDay: "ದಿನಕ್ಕೆ",
+    whatColumn: "ಏನು",
+    detailsColumn: "ವಿವರ",
+    addSomethingElse: "ಮುಂಗಡ",
+    addPaymentShort: "ಪಾವತಿ",
+    dayTotals: "ದಿನ",
     workedThisDay: "ಈ ದಿನ ಕೆಲಸ ಮಾಡಿದ್ದಾರೆ",
     otherAmount: "ಅರ್ಧ ದಿನ, ಹೆಚ್ಚುವರಿ ಅಥವಾ ನಿಗದಿತ ಮೊತ್ತ",
     addAdvance: "ಮುಂಗಡ ಸೇರಿಸಿ",

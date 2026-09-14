@@ -131,7 +131,14 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   day — where he worked, what he took as an advance, what he was paid.
   There is deliberately no ledger list on the worker page: the week gives
   the shape and the day gives the detail, so a flat list of every entry
-  ever was just noise in between.
+  ever was just noise in between. The day itself is one table — what,
+  where, how much — because three card sections for work, advances and
+  payments read as three screens stacked rather than one day.
+- **Never print "1 day x Rs 1,200" next to Rs 600.** He often types a lump
+  sum over a row that still carries days and rate, so the day table shows
+  the multiplication only when it actually produces the amount, and the
+  day count alone when it does not. A sum that disagrees with the figure
+  beside it is worse than no sum.
 - **The labour book is a ledger, not a list.** `worker_entries` rows are
   `work` (what he owes) or `payment`/`advance` (money handed over); `amount`
   always holds the rupee figure so a balance is one sum. Payments there count
