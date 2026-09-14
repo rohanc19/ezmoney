@@ -277,6 +277,22 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   sensitively.** So the spelling fix updates first and merges only when
   Postgres actually returns 23505 — a looser comparison of our own
   (`ilike`) would delete rows that were never going to clash.
+- **One estimate, one invoice.** `convertToInvoice` checks for an invoice
+  already linked to the estimate and goes to it rather than minting a
+  second. He had ₹38,062 of one apartment job on the books twice —
+  INV-2026-013 and -014, same client, same job, same day — because
+  tapping the button again is the obvious thing to do on a phone that has
+  not visibly responded yet, and both bills then counted towards what he
+  was owed.
+- **Home answers one question: what am I owed, and what do I do now.**
+  It carried a Received / Expenses / Profit strip, where Profit was
+  received minus recorded spend — and he records no material expenses at
+  all, so it was a confidently wrong number in the largest type on the
+  screen. The year lives on `/summary`. Dropping it also took two
+  round-trips to Singapore off the screen he opens most.
+- **Do not put a figure on Home that the list below it already shows.**
+  The "this month" card printed ₹1,16,287 two inches above a month
+  heading reading SEP 2026 ₹1,16,287.
 - **The bill renders twice.** `.doc-lines` (blocks) below 640px, and
   `.doc-table-wrap` (the ruled table) at 640px and up *and in print* — the
   table pushed the Amount column off a phone screen behind a scrollbar.

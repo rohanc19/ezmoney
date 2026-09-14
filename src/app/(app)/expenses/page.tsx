@@ -54,25 +54,17 @@ export default async function ExpensesPage({
         </p>
       )}
 
-      <Link href="/checklists" className="card mt-4 flex items-center justify-between gap-3 p-4">
-        <span className="min-w-0">
-          <span className="block font-extrabold">{t.checklists}</span>
-          <span className="block text-sm text-stone-500">{t.checklistsHint}</span>
-        </span>
-        <span aria-hidden className="shrink-0 text-2xl text-stone-400">
-          ›
-        </span>
-      </Link>
-
-      <Link href="/shops" className="card mt-3 flex items-center justify-between gap-3 p-4">
-        <span className="min-w-0">
-          <span className="block font-extrabold">{t.priceBook}</span>
-          <span className="block text-sm text-stone-500">{t.priceBookHint}</span>
-        </span>
-        <span aria-hidden className="shrink-0 text-2xl text-stone-400">
-          ›
-        </span>
-      </Link>
+      {/* Both are about buying materials, and he knows what they are by
+          now — two names side by side rather than two paragraphs that
+          pushed his actual spending off the screen. */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Link href="/checklists" className="card flex min-h-[56px] items-center p-4 font-extrabold">
+          {t.checklists}
+        </Link>
+        <Link href="/shops" className="card flex min-h-[56px] items-center p-4 font-extrabold">
+          {t.priceBook}
+        </Link>
+      </div>
 
       {/* The year's spend, broken out — so this agrees with Home, and he
           can see which half is which. */}
@@ -98,12 +90,7 @@ export default async function ExpensesPage({
       </div>
 
       {(expenses ?? []).length === 0 ? (
-        <div className="card mt-6 p-8 text-center">
-          <p className="mt-3 text-lg text-stone-600">{t.noExpensesYet}</p>
-          <Link href="/expenses/new" className="btn-primary mt-5">
-            + {t.addExpense}
-          </Link>
-        </div>
+        <p className="card mt-6 p-8 text-center text-stone-600">{t.noExpensesYet}</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {(expenses ?? []).map((e) => (

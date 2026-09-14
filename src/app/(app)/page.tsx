@@ -49,30 +49,21 @@ export default async function HomePage({
     ? searchParams.show!
     : "";
 
-  const year = new Date().getFullYear();
-  const from = `${year}-01-01`;
-  const to = `${year}-12-31`;
-
   // One pass over his bills feeds the money, the attention list and the
   // filtered views. Search is the exception — it runs in the database so
   // it can reach bills older than this window.
-  const [{ data: allRaw }, { data: yearExpenses }, { data: yearLabour }] = await Promise.all([
-    supabase
-      .from("documents")
-      .select(
-        "id, type, serial_no, doc_date, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)"
-      )
-      .order("doc_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1000),
-    supabase.from("expenses").select("amount").gte("date", from).lte("date", to),
-    supabase
-      .from("worker_entries")
-      .select("amount")
-      .neq("kind", "work")
-      .gte("entry_date", from)
-      .lte("entry_date", to),
-  ]);
+  //
+  // The year's spend used to be read here too, for a Profit figure in the
+  // hero. It is on /summary now, and Home is two round-trips to Singapore
+  // lighter for it.
+  const { data: allRaw } = await supabase
+    .from("documents")
+    .select(
+      "id, type, serial_no, doc_date, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)"
+    )
+    .order("doc_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1000);
 
   const all = (allRaw ?? []) as unknown as HomeDoc[];
   const invoices = all.filter((d) => d.type === "invoice");
@@ -84,24 +75,6 @@ export default async function HomePage({
     .sort((a, b) => a.doc_date.localeCompare(b.doc_date)); // oldest first — chase those
   const outstanding = unpaid.reduce((s, d) => s + balanceOf(d), 0);
   const oldestDays = unpaid.length > 0 ? daysBetween(unpaid[0].doc_date) : 0;
-
-  // ---- the year's money ----
-  const yearInvoices = invoices.filter((d) => d.doc_date >= from && d.doc_date <= to);
-  const received = yearInvoices.reduce((s, d) => s + Number(d.amount_received), 0);
-  const spent =
-    (yearExpenses ?? []).reduce((s, e) => s + Number(e.amount), 0) +
-    (yearLabour ?? []).reduce((s, e) => s + Number(e.amount), 0);
-  const profit = received - spent;
-
-  // ---- this month against last ----
-  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const now = new Date();
-  const thisKey = monthKey(now);
-  const lastKey = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const billedIn = (key: string) =>
-    invoices.filter((d) => d.doc_date.startsWith(key)).reduce((s, d) => s + Number(d.total), 0);
-  const thisMonth = billedIn(thisKey);
-  const lastMonth = billedIn(lastKey);
 
   // ---- things that need him ----
   const billedEstimateIds = new Set(
@@ -199,26 +172,9 @@ export default async function HomePage({
           <p className="mt-2 text-lg font-bold text-teal-100">{t.nothingOutstanding}</p>
         )}
 
-        <div className="mt-5 grid grid-cols-3 gap-3">
-          <div>
-            <p className="text-[0.7rem] font-semibold text-teal-200">
-              {t.receivedThisYear} · {year}
-            </p>
-            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(received, 0)}</p>
-          </div>
-          <div>
-            <p className="text-[0.7rem] font-semibold text-teal-200">{t.totalExpenses}</p>
-            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(spent, 0)}</p>
-          </div>
-          <div>
-            <p className="text-[0.7rem] font-semibold text-teal-200">{t.profit}</p>
-            <p className="tnum mt-0.5 text-lg font-bold">{formatINR(profit, 0)}</p>
-          </div>
-        </div>
-
         <Link
           href="/documents/new?type=estimate"
-          className="btn mt-6 w-full bg-white text-lg text-accent-deep shadow-sm"
+          className="btn mt-5 w-full bg-white text-lg text-accent-deep shadow-sm"
         >
           ＋ {t.newEstimate}
         </Link>
@@ -255,46 +211,18 @@ export default async function HomePage({
         </>
       )}
 
-      {/* ---------- how the month is going ---------- */}
-      {!show && !q && (thisMonth > 0 || lastMonth > 0) && (
-        <Link href="/summary" className="card mt-4 flex items-center justify-between gap-3 p-4">
-          <span>
-            <span className="block text-xs font-semibold text-stone-500">{t.thisMonth}</span>
-            <span className="tnum text-xl font-extrabold">{formatINR(thisMonth, 0)}</span>
-          </span>
-          <span className="text-right">
-            <span className="block text-xs font-semibold text-stone-500">{t.lastMonth}</span>
-            <span className="tnum font-bold text-stone-600">
-              {formatINR(lastMonth, 0)}
-              {lastMonth > 0 && thisMonth !== lastMonth && (
-                <span className={thisMonth > lastMonth ? "text-green-700" : "text-stone-500"}>
-                  {" "}
-                  {thisMonth > lastMonth ? "↑" : "↓"}
-                </span>
-              )}
-            </span>
-            <span className="mt-0.5 block text-xs font-semibold text-accent">
-              {t.seeTheYear} →
-            </span>
-          </span>
-        </Link>
-      )}
-
       {/* ---------- search + filter ---------- */}
       {!show && (
         <>
-          <form method="get" className="mt-6 flex gap-2">
+          <form method="get" className="mt-6">
             <input
               type="search"
               name="q"
               defaultValue={q}
               placeholder={t.searchPlaceholder}
-              className="field flex-1"
+              className="field"
             />
             {type && <input type="hidden" name="type" value={type} />}
-            <button type="submit" className="btn-secondary px-5">
-              {t.searchBtn}
-            </button>
           </form>
 
           <div className="mt-3 flex gap-2">

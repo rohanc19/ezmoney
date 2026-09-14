@@ -113,7 +113,9 @@ export default async function LabourPage() {
         </ul>
       )}
 
-      <p className="mt-6 text-center text-sm text-stone-500">{t.labourHint}</p>
+      {(workers ?? []).length === 0 && (
+        <p className="mt-6 text-center text-sm text-stone-500">{t.labourHint}</p>
+      )}
     </main>
   );
 }

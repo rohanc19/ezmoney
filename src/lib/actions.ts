@@ -327,6 +327,18 @@ export async function convertToInvoice(formData: FormData) {
     .eq("user_id", user.id)
     .single();
   if (e1) throw e1;
+  // One estimate, one invoice. Tapping "Make the invoice" twice — or once
+  // on a phone that did not look like it had responded — used to mint a
+  // second bill for the same job, and both then counted towards what he
+  // was owed. He had ₹38,062 of one apartment job on the books twice.
+  const { data: already } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("linked_estimate_id", estimateId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (already) redirect(`/documents/${already.id}`);
+
   const { data: items, error: e2 } = await supabase
     .from("line_items")
     .select("*")
