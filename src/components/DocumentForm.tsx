@@ -21,6 +21,8 @@ interface ItemState {
   unit: string;
   rate: string;
   hsn: string;
+  /** Which part of the job. Empty unless he splits the bill. */
+  section: string;
 }
 
 interface Props {
@@ -49,12 +51,13 @@ interface Props {
   t: Dict;
 }
 
-const emptyItem = (hsn: string): ItemState => ({
+const emptyItem = (hsn: string, section = ""): ItemState => ({
   description: "",
   qty: "1",
   unit: "Nos",
   rate: "",
   hsn,
+  section,
 });
 
 export default function DocumentForm({
@@ -85,6 +88,11 @@ export default function DocumentForm({
   const [scMode, setScMode] = useState(initial.service_charge_mode);
   const [scValue, setScValue] = useState(initial.service_charge_value);
   const [scLabel, setScLabel] = useState(initial.service_charge_label);
+  // Off unless this bill already has parts. Most of his cash bills are a
+  // plain list and should look exactly as they always have.
+  const [useParts, setUseParts] = useState(
+    initialItems.some((i) => (i.section ?? "").trim().length > 0)
+  );
   const [newClient, setNewClient] = useState({
     name: "",
     phone: "",
@@ -177,8 +185,17 @@ export default function DocumentForm({
         unit: i.unit,
         rate: Number(i.rate) || 0,
         hsn_sac: i.hsn.trim(),
+        section: useParts ? i.section.trim() : "",
       }))
   );
+
+  /** New rows join the part the previous row was in — he types it once. */
+  const lastSection = () => {
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      if (items[i].section.trim()) return items[i].section;
+    }
+    return "";
+  };
 
   const update = (idx: number, patch: Partial<ItemState>) =>
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -199,6 +216,7 @@ export default function DocumentForm({
         unit: item.unit,
         rate: String(item.rate),
         hsn: item.hsn_sac || defaultHsn,
+        section: lastSection(),
       },
     ]);
 
@@ -210,6 +228,7 @@ export default function DocumentForm({
         unit: s.unit,
         rate: String(s.rate),
         hsn: defaultHsn,
+        section: lastSection(),
       }))
     );
 
@@ -348,6 +367,28 @@ export default function DocumentForm({
           <ScanSheet t={t} onAdd={addFromScan} />
         </div>
 
+        {/* Off by default. A plain bill looks exactly as it always has;
+            only a staged job like internal wiring + meter panel + earthing
+            needs parts, and he says so explicitly. */}
+        <label className="mb-3 flex min-h-[48px] items-center gap-3 rounded-2xl border-2 border-line bg-white px-3.5">
+          <input
+            type="checkbox"
+            checked={useParts}
+            onChange={(e) => setUseParts(e.target.checked)}
+            className="h-6 w-6 shrink-0 accent-teal-700"
+          />
+          <span className="min-w-0">
+            <span className="block font-semibold">{t.useParts}</span>
+            <span className="block text-xs text-stone-500">{t.usePartsHint}</span>
+          </span>
+        </label>
+
+        <datalist id="bill-parts">
+          {[...new Set(items.map((i) => i.section.trim()).filter(Boolean))].map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
+
         <datalist id="recent-descriptions">
           {recentDescriptions.map((d) => (
             <option key={d} value={d} />
@@ -357,6 +398,15 @@ export default function DocumentForm({
         <div className="space-y-3">
           {items.map((item, idx) => (
             <div key={idx} className="card p-3">
+              {useParts && (
+                <input
+                  value={item.section}
+                  onChange={(e) => update(idx, { section: e.target.value })}
+                  placeholder={t.partName}
+                  list="bill-parts"
+                  className="field mb-2 bg-paper text-sm"
+                />
+              )}
               <input
                 value={item.description}
                 onChange={(e) => update(idx, { description: e.target.value })}
@@ -470,7 +520,7 @@ export default function DocumentForm({
 
         <button
           type="button"
-          onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn)])}
+          onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn, lastSection())])}
           className="btn-secondary mt-3 w-full"
         >
           + {t.addItem}
@@ -532,6 +582,29 @@ export default function DocumentForm({
 
       {/* totals */}
       <div className="card p-4">
+        {useParts &&
+          (() => {
+            const parts: { name: string; total: number }[] = [];
+            for (const i of items) {
+              const name = i.section.trim();
+              if (!name) continue;
+              const value = (Number(i.qty) || 0) * (Number(i.rate) || 0);
+              const found = parts.find((p) => p.name === name);
+              if (found) found.total += value;
+              else parts.push({ name, total: value });
+            }
+            if (parts.length === 0) return null;
+            return (
+              <div className="mb-2 border-b border-line pb-2">
+                {parts.map((p) => (
+                  <div key={p.name} className="flex justify-between text-sm text-stone-600">
+                    <span className="truncate">{p.name}</span>
+                    <span className="tnum font-semibold">{formatINR(p.total)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         <div className="flex justify-between text-stone-600">
           <span>{t.subtotal}</span>
           <span className="tnum">{formatINR(subtotal)}</span>

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
@@ -126,6 +127,22 @@ export default async function DocumentViewPage({
     });
     if (uri) qrSvg = await upiQrSvg(uri);
   }
+
+  // His big estimates are named parts, each with its own subtotal — and he
+  // writes a separate summary sheet listing just those figures. An empty
+  // section means a plain bill, which is most of them.
+  const parts: { name: string; lines: NonNullable<typeof items>; total: number }[] = [];
+  for (const li of items ?? []) {
+    const name = ((li.section as string) ?? "").trim();
+    let group = parts.find((g) => g.name === name);
+    if (!group) {
+      group = { name, lines: [], total: 0 };
+      parts.push(group);
+    }
+    group.lines.push(li);
+    group.total += Number(li.amount);
+  }
+  const hasParts = parts.filter((g) => g.name).length > 1;
 
   // A lockup file already carries the business name, so printing the name
   // as text beside it would say it twice.
@@ -496,10 +513,42 @@ export default async function DocumentViewPage({
           )}
         </div>
 
+        {/* The four-line summary he writes on a separate sheet. Printed
+            here so the customer sees the shape of the job before the
+            detail — and so he stops having to make that sheet himself. */}
+        {hasParts && (
+          <div className="doc-summary-parts print-avoid-break">
+            <p className="doc-eyebrow">{docLabels.partsSummary}</p>
+            <table className="doc-table doc-table-fixed mt-1">
+              <tbody>
+                {parts
+                  .filter((g) => g.name)
+                  .map((g, i) => (
+                    <tr key={g.name}>
+                      <td className="tnum" style={{ width: "2.5rem" }}>
+                        {i + 1}
+                      </td>
+                      <td>{g.name}</td>
+                      <td className="doc-num">{formatIndianNumber(g.total)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* the items — on a phone as blocks, because the table pushed the
             amount off the right edge; on paper always the ruled table */}
         <div className="doc-lines">
-          {(items ?? []).map((i, idx) => (
+          {parts.map((group) => (
+            <div key={group.name || "_"}>
+              {hasParts && group.name && (
+                <p className="doc-part-row">
+                  <span>{group.name}</span>
+                  <span className="tnum">{formatINR(group.total)}</span>
+                </p>
+              )}
+              {group.lines.map((i, idx) => (
             <div key={i.id} className="doc-line-row">
               <div className="flex items-start justify-between gap-3">
                 <span className="text-[0.9rem] font-semibold leading-snug">
@@ -513,6 +562,8 @@ export default async function DocumentViewPage({
                 {formatIndianNumber(Number(i.qty), 0)} {i.unit} × {formatINR(Number(i.rate))}
                 {gstOn && i.hsn_sac ? ` · ${docLabels.hsn} ${i.hsn_sac}` : ""}
               </p>
+            </div>
+              ))}
             </div>
           ))}
           {(items ?? []).length === 0 && (
@@ -534,16 +585,28 @@ export default async function DocumentViewPage({
               </tr>
             </thead>
             <tbody>
-              {(items ?? []).map((i, idx) => (
-                <tr key={i.id}>
-                  <td className="tnum">{idx + 1}</td>
-                  <td>{i.description}</td>
-                  {gstOn && <td className="tnum">{i.hsn_sac || "—"}</td>}
-                  <td className="doc-num">{formatIndianNumber(Number(i.qty), 0)}</td>
-                  <td>{i.unit}</td>
-                  <td className="doc-num">{formatIndianNumber(Number(i.rate))}</td>
-                  <td className="doc-num">{formatIndianNumber(Number(i.amount))}</td>
-                </tr>
+              {parts.map((group) => (
+                <Fragment key={group.name || "_"}>
+                  {hasParts && group.name && (
+                    <tr className="doc-part">
+                      <th colSpan={gstOn ? 6 : 5} scope="colgroup">
+                        {group.name}
+                      </th>
+                      <th className="doc-num">{formatIndianNumber(group.total)}</th>
+                    </tr>
+                  )}
+                  {group.lines.map((i, idx) => (
+                    <tr key={i.id}>
+                      <td className="tnum">{idx + 1}</td>
+                      <td>{i.description}</td>
+                      {gstOn && <td className="tnum">{i.hsn_sac || "—"}</td>}
+                      <td className="doc-num">{formatIndianNumber(Number(i.qty), 0)}</td>
+                      <td>{i.unit}</td>
+                      <td className="doc-num">{formatIndianNumber(Number(i.rate))}</td>
+                      <td className="doc-num">{formatIndianNumber(Number(i.amount))}</td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
               {(items ?? []).length === 0 && (
                 <tr>

@@ -342,6 +342,40 @@ button.card:active {
   border-bottom: 0;
 }
 
+/* A part heading inside the items table: its name across the row, its
+   subtotal on the right. Tinted so the eye finds the stages of a job. */
+.doc-table tr.doc-part th {
+  background: var(--doc-tint);
+  border-top: 1.5px solid var(--doc-ink);
+  font-weight: 800;
+  text-align: left;
+  white-space: normal;
+}
+.doc-table tr.doc-part th.doc-num {
+  text-align: right;
+}
+
+/* The same heading on a phone, where the lines are blocks. */
+.doc-part-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--doc-tint);
+  border-top: 1.5px solid var(--doc-ink);
+  border-bottom: 1px solid var(--doc-rule);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.doc-summary-parts {
+  border-bottom: 1.5px solid var(--doc-ink);
+  padding: 0.6rem 0 0.2rem;
+}
+.doc-summary-parts > .doc-eyebrow {
+  padding: 0 0.9rem;
+}
+
 /* Amount in words on the left, the money stack on the right. */
 .doc-summary {
   display: grid;

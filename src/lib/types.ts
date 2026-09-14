@@ -127,6 +127,8 @@ export interface Client {
 export interface LineItem {
   id?: string;
   position: number;
+  /** Which part of the job this line belongs to. Empty = a plain bill. */
+  section: string;
   description: string;
   qty: number;
   unit: string;

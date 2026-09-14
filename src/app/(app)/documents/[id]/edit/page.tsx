@@ -52,6 +52,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
           unit: i.unit,
           rate: String(i.rate),
           hsn: i.hsn_sac ?? "",
+          section: i.section ?? "",
         }))}
         clients={clients}
         rateCard={rateCard}

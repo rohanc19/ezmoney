@@ -52,6 +52,8 @@ interface ItemInput {
   unit: string;
   rate: number;
   hsn_sac: string;
+  /** Which part of the job. Empty on an ordinary flat bill. */
+  section: string;
 }
 
 function parseItems(json: string): ItemInput[] {
@@ -71,6 +73,7 @@ function parseItems(json: string): ItemInput[] {
         unit: String(o.unit ?? "Nos"),
         rate: Number(o.rate) || 0,
         hsn_sac: String(o.hsn_sac ?? "").trim(),
+        section: String(o.section ?? "").trim().slice(0, 60),
       };
     })
     .filter((i) => i.description.length > 0);
@@ -154,6 +157,7 @@ export async function saveDocument(formData: FormData) {
     amount: i.qty * i.rate,
     hsn_sac: i.hsn_sac || (profile?.default_hsn_sac ?? ""),
     gst_rate: gstRate,
+    section: i.section,
   }));
 
   const itemsSubtotal = taxLines.reduce((s, i) => s + i.amount, 0);
@@ -227,6 +231,7 @@ export async function saveDocument(formData: FormData) {
         amount: i.amount,
         hsn_sac: i.hsn_sac,
         gst_rate: i.gst_rate,
+        section: i.section,
       }))
     );
     if (error) throw error;
@@ -370,6 +375,7 @@ export async function convertToInvoice(formData: FormData) {
         amount: i.amount,
         hsn_sac: i.hsn_sac ?? "",
         gst_rate: i.gst_rate ?? 0,
+        section: i.section ?? "",
       }))
     );
     if (e5) throw e5;

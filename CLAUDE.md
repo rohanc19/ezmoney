@@ -63,6 +63,7 @@ supabase/migrations/0003_v3.sql     labour book (workers + worker_entries), serv
 supabase/migrations/0004_v4.sql     shop price book (shops + item_prices)
 supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
 supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anything looks wrong
+supabase/migrations/0007_sections.sql line_items.section — parts of a job
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
 src/middleware.ts                   session refresh + login redirect
@@ -168,6 +169,15 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **Sharing is what marks a bill sent.** Save as PDF, WhatsApp and Gmail all
   call `markSentIfDraft`; there is no chore to remember. Ten bills in, every
   one of them was still a draft.
+- **A bill can be split into named parts, and usually is not.** His big
+  estimates are staged — Internal Wiring, Underground Cable, Meter Panal,
+  BESCOM Charges — each with its own items, its own labour line and its own
+  subtotal, and he used to write the four-line summary on a separate sheet.
+  `line_items.section` holds the part; empty means a plain bill, which is
+  what most of his cash bills are. The form's toggle is off unless the bill
+  already has parts, so an ordinary bill looks exactly as it always did, and
+  a new row inherits the part of the row above it so he types the name once.
+  The printed sheet prints the summary block only when there are two or more.
 - **The bill renders twice.** `.doc-lines` (blocks) below 640px, and
   `.doc-table-wrap` (the ruled table) at 640px and up *and in print* — the
   table pushed the Amount column off a phone screen behind a scrollbar.

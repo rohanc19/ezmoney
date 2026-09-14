@@ -16,6 +16,8 @@ export interface TaxLine {
   amount: number;
   hsn_sac: string;
   gst_rate: number;
+  /** Which part of the job this line sits under. Tax ignores it. */
+  section?: string;
 }
 
 export interface SlabSummary {
