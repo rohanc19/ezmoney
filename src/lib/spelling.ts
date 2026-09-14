@@ -30,6 +30,8 @@ const WORDS: Record<string, string> = {
   ligrand: "Legrand",
   coatch: "Coach",
   sleaves: "Sleeves",
+  saddel: "Saddle",
+  sadle: "Saddle",
   geaser: "Geyser",
   geyzer: "Geyser",
   leter: "Litre",
