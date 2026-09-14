@@ -174,7 +174,12 @@ button.card:active {
   }
 }
 .rise {
-  animation: rise 240ms ease-out both;
+  /* `backwards`, never `forwards` or `both`. A filled animation stays
+     applied after it ends, and an applied opacity animation keeps a
+     stacking context alive — which trapped every full-screen sheet
+     inside this wrapper underneath the nav bar's z-40. `backwards` gives
+     the same smooth start and lets the context go when the fade ends. */
+  animation: rise 240ms ease-out backwards;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

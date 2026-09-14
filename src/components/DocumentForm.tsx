@@ -208,17 +208,18 @@ export default function DocumentForm({
       return [...base, ...rows];
     });
 
-  const addFromRateCard = (item: RateCardItem) =>
-    appendRows([
-      {
+  // He can tick several at once, so this takes a list.
+  const addFromRateCard = (chosen: RateCardItem[]) =>
+    appendRows(
+      chosen.map((item) => ({
         description: item.description,
         qty: "1",
         unit: item.unit,
         rate: String(item.rate),
         hsn: item.hsn_sac || defaultHsn,
         section: lastSection(),
-      },
-    ]);
+      }))
+    );
 
   const addFromScan = (scanned: ScannedItem[]) =>
     appendRows(

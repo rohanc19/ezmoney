@@ -158,11 +158,14 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   view and attaches it himself. Sending the bill from the server would need
   either a share link or a real PDF, and the latter is what the no-PDF-library
   rule rules out. See `src/lib/share.ts`.
-- **Never animate `transform` on an ancestor of the whole page.** `.rise`
-  wraps every screen; while it animated transform it became the containing
-  block for every `position: fixed` descendant, which silently pushed the
-  running-total bar off-screen and left the full-screen scan and rate-card
-  sheets positioned against the page instead of the viewport. It fades only.
+- **`.rise` must never use `forwards` or `both` fill-mode.** It wraps every
+  screen, and a *filled* animation stays applied after it ends — an applied
+  opacity animation keeps a stacking context alive for good, which trapped
+  the full-screen sheets and the running-total bar underneath the nav bar's
+  `z-40` no matter what z-index they asked for. `backwards` gives the same
+  smooth fade in and releases the context when the animation ends. The
+  earlier form of this bug was the same wrapper animating `transform`, which
+  additionally made it the containing block for every fixed descendant.
 - **A customer copy never shows workflow status.** The printed bill prints
   PAID or PART PAID when money has arrived, and nothing otherwise — every
   bill he had sent read "Draft".
