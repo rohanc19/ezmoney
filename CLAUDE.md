@@ -33,6 +33,11 @@ option that is simpler for him, not the one that is more capable.
 - **His words, not software words.** "New Bill", "Final Invoice", "Save as PDF" —
   never "Create Document", "Entity", "Record".
 - **One clear primary action per screen.** Secondary actions are visibly smaller.
+- **Anything he needs occasionally is a one-line link, not a block.** The bill
+  form is the screen he lives on, so parts and the service charge sit behind
+  "+ Split into parts" and "+ Add a service charge" under Add Item, and only
+  unfold once asked for. The totals card is hidden entirely when there is no
+  breakdown to show, because the running-total bar already says the number.
 - **Forgiving.** Auto-saved drafts, confirm before destructive actions,
   plain-language errors that say what to do next.
 - **Status is colour + word**, never colour alone.

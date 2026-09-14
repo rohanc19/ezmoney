@@ -368,22 +368,6 @@ export default function DocumentForm({
           <ScanSheet t={t} onAdd={addFromScan} />
         </div>
 
-        {/* Off by default. A plain bill looks exactly as it always has;
-            only a staged job like internal wiring + meter panel + earthing
-            needs parts, and he says so explicitly. */}
-        <label className="mb-3 flex min-h-[48px] items-center gap-3 rounded-2xl border-2 border-line bg-white px-3.5">
-          <input
-            type="checkbox"
-            checked={useParts}
-            onChange={(e) => setUseParts(e.target.checked)}
-            className="h-6 w-6 shrink-0 accent-teal-700"
-          />
-          <span className="min-w-0">
-            <span className="block font-semibold">{t.useParts}</span>
-            <span className="block text-xs text-stone-500">{t.usePartsHint}</span>
-          </span>
-        </label>
-
         <datalist id="bill-parts">
           {[...new Set(items.map((i) => i.section.trim()).filter(Boolean))].map((p) => (
             <option key={p} value={p} />
@@ -526,109 +510,130 @@ export default function DocumentForm({
         >
           + {t.addItem}
         </button>
-      </div>
 
-      {/* service charge — his fee for the job, on top of the items */}
-      <div>
-        <p className="label">{t.serviceCharge}</p>
-        <div className="card space-y-3 p-4">
-          <p className="text-sm text-stone-500">{t.serviceChargeHint}</p>
-          <select
-            name="service_charge_mode"
-            value={scMode}
-            onChange={(e) => setScMode(e.target.value)}
-            className="field"
-            aria-label={t.serviceCharge}
+        {/* The two things he needs occasionally, as links rather than
+            blocks. A plain cash bill never has to look at either. */}
+        <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm">
+          <button
+            type="button"
+            onClick={() => setUseParts((v) => !v)}
+            className="min-h-[36px] font-semibold text-accent underline"
           >
-            <option value="none">{t.serviceChargeNone}</option>
-            <option value="percent">{t.serviceChargePercent}</option>
-            <option value="amount">{t.serviceChargeFixed}</option>
-          </select>
-
-          {scMode !== "none" && (
-            <>
-              <div>
-                <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_value">
-                  {scMode === "percent" ? t.percentOfItems : `${t.amount} (₹)`}
-                </label>
-                <input
-                  id="sc_value"
-                  name="service_charge_value"
-                  value={scValue}
-                  onChange={(e) => setScValue(e.target.value)}
-                  inputMode="decimal"
-                  className="field tnum"
-                />
-              </div>
-              <div>
-                <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_label">
-                  {t.serviceChargeName}
-                </label>
-                <input
-                  id="sc_label"
-                  name="service_charge_label"
-                  value={scLabel}
-                  onChange={(e) => setScLabel(e.target.value)}
-                  className="field"
-                />
-              </div>
-              <div className="flex justify-between border-t border-line pt-2 font-bold">
-                <span>{scLabel || t.serviceCharge}</span>
-                <span className="tnum">{formatINR(serviceCharge)}</span>
-              </div>
-            </>
+            {useParts ? `- ${t.removeParts}` : `+ ${t.useParts}`}
+          </button>
+          {scMode === "none" && (
+            <button
+              type="button"
+              onClick={() => setScMode("percent")}
+              className="min-h-[36px] font-semibold text-accent underline"
+            >
+              + {t.addServiceCharge}
+            </button>
           )}
         </div>
       </div>
 
-      {/* totals */}
-      <div className="card p-4">
-        {useParts &&
-          (() => {
-            const parts: { name: string; total: number }[] = [];
-            for (const i of items) {
-              const name = i.section.trim();
-              if (!name) continue;
-              const value = (Number(i.qty) || 0) * (Number(i.rate) || 0);
-              const found = parts.find((p) => p.name === name);
-              if (found) found.total += value;
-              else parts.push({ name, total: value });
-            }
-            if (parts.length === 0) return null;
-            return (
-              <div className="mb-2 border-b border-line pb-2">
-                {parts.map((p) => (
-                  <div key={p.name} className="flex justify-between text-sm text-stone-600">
-                    <span className="truncate">{p.name}</span>
-                    <span className="tnum font-semibold">{formatINR(p.total)}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        <div className="flex justify-between text-stone-600">
-          <span>{t.subtotal}</span>
-          <span className="tnum">{formatINR(subtotal)}</span>
-        </div>
-        {serviceCharge !== 0 && (
-          <div className="mt-1 flex justify-between text-stone-600">
-            <span>{scLabel || t.serviceCharge}</span>
-            <span className="tnum">{formatINR(serviceCharge)}</span>
+      {/* Only once he has asked for it — see the link under Add Item. */}
+      {scMode !== "none" && (
+        <div>
+          <p className="label">{t.serviceCharge}</p>
+          <div className="card space-y-3 p-4">
+            <select
+              name="service_charge_mode"
+              value={scMode}
+              onChange={(e) => setScMode(e.target.value)}
+              className="field"
+              aria-label={t.serviceCharge}
+            >
+              <option value="percent">{t.serviceChargePercent}</option>
+              <option value="amount">{t.serviceChargeFixed}</option>
+              <option value="none">{t.serviceChargeNone}</option>
+            </select>
+
+            <div>
+              <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_value">
+                {scMode === "percent" ? t.percentOfItems : `${t.amount} (₹)`}
+              </label>
+              <input
+                id="sc_value"
+                name="service_charge_value"
+                value={scValue}
+                onChange={(e) => setScValue(e.target.value)}
+                inputMode="decimal"
+                className="field tnum"
+              />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-xs text-stone-500" htmlFor="sc_label">
+                {t.serviceChargeName}
+              </label>
+              <input
+                id="sc_label"
+                name="service_charge_label"
+                value={scLabel}
+                onChange={(e) => setScLabel(e.target.value)}
+                className="field"
+              />
+            </div>
+            <div className="flex justify-between border-t border-line pt-2 font-bold">
+              <span>{scLabel || t.serviceCharge}</span>
+              <span className="tnum">{formatINR(serviceCharge)}</span>
+            </div>
           </div>
-        )}
-        {gstEnabled && (
-          <div className="mt-1 flex justify-between text-stone-600">
-            <span>
-              {t.gst} ({(gstRate * 100).toFixed(0)}%)
-            </span>
-            <span className="tnum">{formatINR(gstAmount)}</span>
-          </div>
-        )}
-        <div className="mt-2 flex justify-between border-t border-line pt-2 text-xl font-extrabold">
-          <span>{t.total}</span>
-          <span className="tnum">{formatINR(total)}</span>
         </div>
-      </div>
+      )}
+
+      {/* Only when there is a breakdown worth showing. With no service
+          charge and GST off it just repeated the running-total bar. */}
+      {(serviceCharge !== 0 || gstEnabled || useParts) && (
+        <div className="card p-4">
+          {useParts &&
+            (() => {
+              const parts: { name: string; total: number }[] = [];
+              for (const i of items) {
+                const name = i.section.trim();
+                if (!name) continue;
+                const value = (Number(i.qty) || 0) * (Number(i.rate) || 0);
+                const found = parts.find((p) => p.name === name);
+                if (found) found.total += value;
+                else parts.push({ name, total: value });
+              }
+              if (parts.length === 0) return null;
+              return (
+                <div className="mb-2 border-b border-line pb-2">
+                  {parts.map((p) => (
+                    <div key={p.name} className="flex justify-between text-sm text-stone-600">
+                      <span className="truncate">{p.name}</span>
+                      <span className="tnum font-semibold">{formatINR(p.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          <div className="flex justify-between text-stone-600">
+            <span>{t.subtotal}</span>
+            <span className="tnum">{formatINR(subtotal)}</span>
+          </div>
+          {serviceCharge !== 0 && (
+            <div className="mt-1 flex justify-between text-stone-600">
+              <span>{scLabel || t.serviceCharge}</span>
+              <span className="tnum">{formatINR(serviceCharge)}</span>
+            </div>
+          )}
+          {gstEnabled && (
+            <div className="mt-1 flex justify-between text-stone-600">
+              <span>
+                {t.gst} ({(gstRate * 100).toFixed(0)}%)
+              </span>
+              <span className="tnum">{formatINR(gstAmount)}</span>
+            </div>
+          )}
+          <div className="mt-2 flex justify-between border-t border-line pt-2 text-xl font-extrabold">
+            <span>{t.total}</span>
+            <span className="tnum">{formatINR(total)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Status is a decision he never needs when writing a bill — a new
           one is a draft, and sharing it is what makes it sent. On an
