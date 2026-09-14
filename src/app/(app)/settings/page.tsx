@@ -311,6 +311,17 @@ export default async function SettingsPage({
                 className="field"
               />
             </div>
+            <div>
+              <label className="label" htmlFor="bank_branch">
+                {t.bankBranch}
+              </label>
+              <input
+                id="bank_branch"
+                name="bank_branch"
+                defaultValue={p?.bank_branch ?? ""}
+                className="field"
+              />
+            </div>
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="label" htmlFor="account_no">
@@ -360,6 +371,19 @@ export default async function SettingsPage({
                 name="payment_terms"
                 rows={2}
                 defaultValue={p?.payment_terms ?? ""}
+                className="field"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="terms">
+                {t.termsBlock}
+              </label>
+              <p className="mb-1 text-sm text-stone-500">{t.termsBlockHint}</p>
+              <textarea
+                id="terms"
+                name="terms"
+                rows={4}
+                defaultValue={p?.terms ?? ""}
                 className="field"
               />
             </div>

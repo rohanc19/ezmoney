@@ -97,11 +97,14 @@ export interface BusinessProfile {
   gst_enabled: boolean;
   gst_rate: number;
   bank_name: string;
+  bank_branch: string;
   account_no: string;
   ifsc: string;
   upi_id: string;
   payment_terms: string;
   estimate_validity_note: string;
+  /** The standing block printed at the foot of every bill. */
+  terms: string;
   logo_url: string | null;
   serial_year_basis: "calendar" | "fiscal";
   state_code: string;
@@ -122,6 +125,7 @@ export interface Client {
   state_code: string;
   state_name: string;
   gstin: string | null;
+  pan: string;
 }
 
 export interface LineItem {

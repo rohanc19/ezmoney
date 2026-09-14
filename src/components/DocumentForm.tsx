@@ -31,6 +31,7 @@ interface Props {
   type: "estimate" | "invoice";
   initial: {
     doc_date: string;
+    due_date: string;
     client_id: string;
     site_job: string;
     notes: string;
@@ -82,6 +83,11 @@ export default function DocumentForm({
   );
   const [clientId, setClientId] = useState(initial.client_id);
   const [docDate, setDocDate] = useState(initial.doc_date);
+  // Most of his bills are settled on the spot, so the due date stays out
+  // of the way until he asks for it — and shows itself on a bill that has
+  // one already.
+  const [dueDate, setDueDate] = useState(initial.due_date);
+  const [showDue, setShowDue] = useState(Boolean(initial.due_date));
   const [siteJob, setSiteJob] = useState(initial.site_job);
   const [notes, setNotes] = useState(initial.notes);
   const [status, setStatus] = useState(initial.status);
@@ -345,6 +351,30 @@ export default function DocumentForm({
           onChange={(e) => setDocDate(e.target.value)}
           className="field"
         />
+        {type === "invoice" &&
+          (showDue ? (
+            <div className="mt-3">
+              <label htmlFor="due_date" className="label">
+                {t.dueDate}
+              </label>
+              <input
+                id="due_date"
+                type="date"
+                name="due_date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="field"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDue(true)}
+              className="mt-1 min-h-[36px] text-sm font-semibold text-accent underline"
+            >
+              + {t.addDueDate}
+            </button>
+          ))}
       </div>
       <div>
         <label htmlFor="site_job" className="label">

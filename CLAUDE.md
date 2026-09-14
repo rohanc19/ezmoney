@@ -19,8 +19,9 @@ option that is simpler for him, not the one that is more capable.
   fetching frameworks. Check the bundle line in `next build` output before shipping.
   Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
   and expense forms (the three client components — DocumentForm, ScanSheet,
-  RatePicker). That is the ceiling; anything that pushes a route past ~105 kB
-  needs a reason.
+  RatePicker); the bill form went to 103 kB when the due date was added.
+  That is the ceiling; anything that pushes a route past ~105 kB needs a
+  reason.
 - **What actually costs him is paint, not bytes.** The machine renders in
   software more often than not. So: no `backdrop-filter` (it re-blurs the
   backdrop every scroll frame — it was on the nav and the total bar, and both
@@ -70,6 +71,7 @@ supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
 supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anything looks wrong
 supabase/migrations/0007_sections.sql line_items.section — parts of a job
 supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist_items)
+supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, terms block
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
@@ -217,6 +219,39 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   already has parts, so an ordinary bill looks exactly as it always did, and
   a new row inherits the part of the row above it so he types the name once.
   The printed sheet prints the summary block only when there are two or more.
+- **The printed sheet is a GST tax invoice, modelled on his accountant's.**
+  Letterhead with the mark and his contact block, a banner carrying the
+  GSTIN and which copy it is, a Customer Detail panel, then a ruled grid
+  that carries the tax *per line* — CGST and SGST each as a % and an
+  Amount, IGST alone when interstate — and a foot of words, bank, terms,
+  money ladder and signature. The whole thing is roughly 715px wide at
+  print sizes against 718px of A4 at 10mm margins, so the grid headings
+  must be allowed to wrap (`white-space: normal`): holding "Taxable
+  Value" on one line is what pushes the Total column off the sheet.
+- **A column that does not add up is the first thing an accountant sees.**
+  Rounding each row and summing does not generally equal a total rounded
+  once at the end, so `computeLineTaxes` in `src/lib/gst.ts` reconciles
+  every column against `computeTotals` — the odd paisa goes onto the
+  largest row. `computeTotals` stays the authority; the per-line function
+  only ever redistributes its own rounding. Verified against his real
+  17-Aug-2026 Nova Techset invoice, whose CGST column it reproduces
+  exactly.
+- **The printed sheet takes its figures from `totals`, not from the row.**
+  `printedTotal` / `printedBalance` in the document page are recomputed,
+  so the grid, the amount in words and the money ladder can never
+  disagree with each other on the page. The app's own money screens
+  (Home, balance due) keep reading the stored `total` and
+  `amount_received` — those are about what he is owed, not about what the
+  paper says.
+- **Never name columns in the `clients` embed on the document page.**
+  PostgREST rejects the entire query for one unknown column, `doc` comes
+  back null and `notFound()` fires — so a migration that has not been run
+  yet turns into a 404 on every single bill rather than a missing field.
+  `clients(*)` degrades to a blank row instead.
+- **The UPI QR writes its own width and height onto the `<svg>`** (132px),
+  so the box around it must size the SVG (`.doc-qr > svg { width: 100% }`)
+  rather than just clipping it — an undersized box printed "Scan to pay"
+  across the code itself.
 - **The bill renders twice.** `.doc-lines` (blocks) below 640px, and
   `.doc-table-wrap` (the ruled table) at 640px and up *and in print* — the
   table pushed the Amount column off a phone screen behind a scrollbar.

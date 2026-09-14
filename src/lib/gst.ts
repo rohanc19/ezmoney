@@ -160,3 +160,110 @@ export function computeTotals(
     slabs,
   };
 }
+
+/** One printed row of the tax invoice grid. */
+export interface LineTax {
+  /** The row as printed: description, qty, unit, rate. */
+  description: string;
+  qty: number;
+  unit: string;
+  rate: number;
+  hsn_sac: string;
+  section?: string;
+  /** The GST rate applied to this row, e.g. 0.18. */
+  gstRate: number;
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  /** taxable + tax — the row's own Total column. */
+  total: number;
+}
+
+/**
+ * The line items as the rows of a GST grid, with the tax split out per row.
+ *
+ * A column of rounded rows does not generally add up to a total that was
+ * rounded once at the end, and on a tax invoice a column that does not add
+ * up is the first thing an accountant notices. So every column here is
+ * reconciled against `computeTotals` — the paisa of difference is pushed
+ * onto the largest row — which makes the printed column sum to the printed
+ * footer by construction, not by luck. `computeTotals` stays the authority;
+ * this only ever redistributes its own rounding.
+ *
+ * The service charge is a taxed supply, so it comes back as a final row.
+ */
+export function computeLineTaxes(
+  items: TaxLine[],
+  totals: Totals,
+  opts: { serviceChargeLabel?: string; fallbackRate: number }
+): LineTax[] {
+  const rows: LineTax[] = items.map((i) => ({
+    description: i.description,
+    qty: i.qty,
+    unit: i.unit,
+    rate: i.rate,
+    hsn_sac: i.hsn_sac,
+    section: i.section,
+    gstRate: i.gst_rate > 0 ? i.gst_rate : opts.fallbackRate,
+    taxable: round2(i.qty * i.rate),
+    cgst: 0,
+    sgst: 0,
+    igst: 0,
+    total: 0,
+  }));
+
+  if (totals.serviceCharge !== 0) {
+    rows.push({
+      description: opts.serviceChargeLabel || "Service Charge",
+      qty: 1,
+      unit: "Job",
+      rate: totals.serviceCharge,
+      hsn_sac: "",
+      gstRate: opts.fallbackRate,
+      taxable: totals.serviceCharge,
+      cgst: 0,
+      sgst: 0,
+      igst: 0,
+      total: 0,
+    });
+  }
+
+  if (rows.length === 0) return rows;
+
+  // The row that absorbs each column's rounding: the biggest one, where a
+  // paisa is least visible.
+  let anchor = 0;
+  for (let n = 1; n < rows.length; n++) {
+    if (Math.abs(rows[n].taxable) > Math.abs(rows[anchor].taxable)) anchor = n;
+  }
+
+  const settle = (key: "taxable" | "cgst" | "sgst" | "igst", target: number) => {
+    const sum = round2(rows.reduce((s, r) => s + r[key], 0));
+    rows[anchor][key] = round2(rows[anchor][key] + round2(target - sum));
+  };
+
+  settle("taxable", totals.taxableValue);
+
+  for (const r of rows) {
+    const tax = r.taxable * r.gstRate;
+    if (totals.gstAmount === 0) continue;
+    if (totals.interState) {
+      r.igst = round2(tax);
+    } else {
+      r.cgst = round2(tax / 2);
+      r.sgst = round2(tax / 2);
+    }
+  }
+  if (totals.gstAmount !== 0) {
+    settle("cgst", totals.cgst);
+    settle("sgst", totals.sgst);
+    settle("igst", totals.igst);
+  }
+
+  for (const r of rows) {
+    r.total = round2(r.taxable + r.cgst + r.sgst + r.igst);
+  }
+
+  return rows;
+}

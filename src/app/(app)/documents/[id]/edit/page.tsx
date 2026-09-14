@@ -36,6 +36,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         type={doc.type}
         initial={{
           doc_date: doc.doc_date,
+          due_date: doc?.due_date ?? "",
           client_id: doc.client_id ?? "",
           site_job: doc.site_job,
           notes: doc.notes,

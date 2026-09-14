@@ -33,6 +33,7 @@ export default async function NewDocumentPage({
         type={type}
         initial={{
           doc_date: today,
+          due_date: "",
           client_id: "",
           site_job: "",
           notes: "",

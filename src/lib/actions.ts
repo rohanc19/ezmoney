@@ -91,6 +91,8 @@ export async function saveDocument(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const type = formData.get("type") === "invoice" ? "invoice" : "estimate";
   const doc_date = String(formData.get("doc_date") ?? "") || new Date().toISOString().slice(0, 10);
+  // Optional: blank means the bill carries no due date and prints none.
+  const due_date = String(formData.get("due_date") ?? "").trim() || null;
   const site_job = String(formData.get("site_job") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const status = String(formData.get("status") ?? "draft");
@@ -177,6 +179,7 @@ export async function saveDocument(formData: FormData) {
 
   const docFields = {
     doc_date,
+    due_date,
     client_id,
     site_job,
     status,
@@ -576,6 +579,7 @@ export async function saveClient(formData: FormData) {
     state_code: code,
     state_name: stateName(code),
     gstin: String(formData.get("gstin") ?? "").trim() || null,
+    pan: String(formData.get("pan") ?? "").trim(),
   };
   if (!row.name) redirect("/clients");
 
@@ -673,11 +677,13 @@ export async function saveProfile(formData: FormData) {
     service_charge_label:
       String(formData.get("service_charge_label") ?? "").trim() || "Service Charge",
     bank_name: String(formData.get("bank_name") ?? "").trim(),
+    bank_branch: String(formData.get("bank_branch") ?? "").trim(),
     account_no: String(formData.get("account_no") ?? "").trim(),
     ifsc: String(formData.get("ifsc") ?? "").trim(),
     upi_id: String(formData.get("upi_id") ?? "").trim(),
     payment_terms: String(formData.get("payment_terms") ?? "").trim(),
     estimate_validity_note: String(formData.get("estimate_validity_note") ?? "").trim(),
+    terms: String(formData.get("terms") ?? "").trim(),
   };
   const { error } = await supabase.from("business_profile").upsert(row);
   if (error) throw error;

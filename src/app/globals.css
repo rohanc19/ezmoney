@@ -381,41 +381,224 @@ button.card:active {
   padding: 0 0.9rem;
 }
 
-/* Amount in words on the left, the money stack on the right. */
-.doc-summary {
+/* -------------------------------------------------------------
+   The letterhead. His name and how to reach him on the right, the
+   way the tax invoice his accountant issues sets it out.
+   ------------------------------------------------------------- */
+.doc-letterhead {
   display: grid;
   grid-template-columns: 1fr;
-  border-top: 1.5px solid var(--doc-ink);
+  border-bottom: 1px solid var(--doc-rule);
 }
-.doc-summary > * + * {
+.doc-letterhead > * + * {
   border-top: 1px solid var(--doc-rule);
 }
 @media (min-width: 640px), print {
-  .doc-summary {
-    grid-template-columns: 1fr 17rem;
+  .doc-letterhead {
+    grid-template-columns: 1.5fr 1fr;
   }
-  .doc-summary > * + * {
+  .doc-letterhead > * + * {
+    border-top: 0;
+    border-left: 0;
+  }
+}
+
+.doc-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.doc-logo {
+  height: 2.6rem;
+  width: auto;
+}
+.doc-business {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.doc-address {
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #5f5952;
+  max-width: 22rem;
+}
+
+.doc-contact {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: #3d3934;
+}
+.doc-contact > p > span {
+  color: #7a736a;
+}
+@media (min-width: 640px), print {
+  .doc-contact {
+    text-align: right;
+  }
+}
+
+/* What this piece of paper is, with the GSTIN and the copy marking
+   either side of it. */
+.doc-banner {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 0.15rem;
+  border-top: 1px solid var(--doc-rule);
+  border-bottom: 1.5px solid var(--doc-ink);
+  background: var(--doc-tint);
+  padding: 0.4rem 0.9rem;
+}
+@media (min-width: 640px), print {
+  .doc-banner {
+    grid-template-columns: 1fr auto 1fr;
+  }
+}
+.doc-banner-side {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #4a453f;
+}
+@media (min-width: 640px), print {
+  .doc-banner-right {
+    text-align: right;
+  }
+}
+.doc-banner-title {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* Who it is for, against the bill's own numbers. */
+.doc-parties {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-bottom: 1.5px solid var(--doc-ink);
+}
+.doc-parties > * + * {
+  border-top: 1px solid var(--doc-rule);
+}
+@media (min-width: 640px), print {
+  .doc-parties {
+    grid-template-columns: 1.5fr 1fr;
+  }
+  .doc-parties > * + * {
     border-top: 0;
     border-left: 1px solid var(--doc-rule);
   }
 }
 
-.doc-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.22rem 0;
-  font-size: 0.85rem;
+/* Label column, value column — the shape a clerk reads down. */
+.doc-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
-.doc-line-total {
-  margin-top: 0.35rem;
-  border-top: 1.5px solid var(--doc-ink);
-  padding-top: 0.4rem;
-  font-size: 1.05rem;
-  font-weight: 800;
+.doc-dl > dt {
+  color: #7a736a;
+  white-space: nowrap;
+}
+.doc-dl > dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-/* How to pay, and who signed. */
+/* PAID / PART PAID — the only workflow word a customer copy may carry. */
+.doc-stamp {
+  margin-top: 0.6rem;
+  display: inline-block;
+  border: 1.5px solid var(--doc-ink);
+  padding: 0.12rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+/* -------------------------------------------------------------
+   The grid. Eleven columns on a tax invoice, so the head is two
+   rows deep: CGST and SGST each span a % and an Amount.
+   ------------------------------------------------------------- */
+.doc-grid {
+  font-size: 0.72rem;
+}
+.doc-grid th,
+.doc-grid td {
+  padding: 0.3rem 0.32rem;
+}
+/* Eleven columns only fit if the headings may wrap: "Taxable Value"
+   held on one line is what pushes the Total column off the sheet. */
+.doc-grid th {
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+}
+/* The description absorbs whatever the figures leave. */
+.doc-grid td:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+.doc-grid th.doc-num {
+  text-align: right;
+}
+.doc-grid-sr {
+  width: 2.6rem;
+}
+.doc-grid-group {
+  text-align: center;
+}
+.doc-grid-pct {
+  width: 2.6rem;
+}
+.doc-grid tbody td {
+  vertical-align: top;
+}
+
+/* Runs the ruled grid down the page, so a four-line bill still reads
+   as a printed form rather than as a receipt. Screen has no page to
+   fill, so it only appears on paper. */
+.doc-grid-filler {
+  display: none;
+}
+@media print {
+  .doc-grid-filler {
+    display: table-row;
+  }
+  .doc-grid-filler > td {
+    height: 5rem;
+  }
+}
+
+.doc-grid-total > td {
+  border-top: 1.5px solid var(--doc-ink);
+  background: var(--doc-tint);
+  font-weight: 800;
+  padding: 0.4rem;
+}
+.doc-grid-total > td:first-child {
+  text-align: right;
+  letter-spacing: 0.04em;
+}
+
+/* The grid is wider than a phone; on paper it always fits the page. */
+@media (min-width: 640px) {
+  .doc-table-wrap {
+    overflow-x: auto;
+  }
+}
+
+/* -------------------------------------------------------------
+   The foot: words, bank and terms stacked against the money
+   ladder and the signature.
+   ------------------------------------------------------------- */
 .doc-foot {
   display: grid;
   grid-template-columns: 1fr;
@@ -426,19 +609,74 @@ button.card:active {
 }
 @media (min-width: 640px), print {
   .doc-foot {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 18rem;
   }
   .doc-foot > * + * {
     border-top: 0;
     border-left: 1px solid var(--doc-rule);
   }
 }
+.doc-foot-rule {
+  border-top: 1px solid var(--doc-rule);
+}
 
+.doc-foot-right {
+  display: flex;
+  flex-direction: column;
+}
+.doc-ladder {
+  padding: 0.55rem 0.9rem;
+}
+/* A label and its figure, at opposite ends of the ladder. */
+.doc-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.22rem 0;
+  font-size: 0.82rem;
+}
+.doc-line-total {
+  margin-top: 0.35rem;
+  border-top: 1.5px solid var(--doc-ink);
+  padding-top: 0.4rem;
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+.doc-line-rule {
+  border-top: 1px solid var(--doc-rule);
+  margin-top: 0.2rem;
+  padding-top: 0.3rem;
+  font-weight: 700;
+}
+.doc-eoe {
+  margin-top: 0.35rem;
+  text-align: right;
+  font-size: 0.66rem;
+  color: #7a736a;
+}
+
+/* upiQrSvg writes its own width and height onto the <svg>, which
+   overflowed the box and put "Scan to pay" across the code itself. */
+.doc-qr {
+  width: 104px;
+}
+.doc-qr > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.doc-sign {
+  margin-top: auto;
+  border-top: 1px solid var(--doc-rule);
+  padding: 0.55rem 0.9rem 0.6rem;
+  text-align: center;
+}
 .doc-sign-line {
-  margin-top: 3.2rem;
+  margin-top: 2.6rem;
   border-top: 1px solid var(--doc-ink);
   padding-top: 0.25rem;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #6b645b;
 }
 
@@ -497,9 +735,28 @@ button.card:active {
   .print-avoid-break {
     break-inside: avoid;
   }
-  /* Long bills repeat the column headings on every page. */
+  /* Long bills repeat the column headings on every page, and carry
+     the Total row onto the last one. */
   .doc-table thead {
     display: table-header-group;
+  }
+  .doc-grid tfoot {
+    display: table-footer-group;
+  }
+  /* The grid fits the page on paper — never a scrollbar, never clipped. */
+  .doc-table-wrap {
+    overflow: visible !important;
+  }
+  .doc-grid {
+    font-size: 0.68rem;
+    table-layout: auto;
+  }
+  /* The letterhead and the foot are each one block of the page. */
+  .doc-letterhead,
+  .doc-banner,
+  .doc-parties,
+  .doc-foot {
+    break-inside: avoid;
   }
   .doc-table tr {
     break-inside: avoid;

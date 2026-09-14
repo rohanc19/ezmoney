@@ -12,7 +12,7 @@ import {
   setDocumentStatus,
 } from "@/lib/actions";
 import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
-import { computeTotals } from "@/lib/gst";
+import { computeLineTaxes, computeTotals } from "@/lib/gst";
 import { docLabels, getDict } from "@/lib/i18n";
 import { buildBillEmail } from "@/lib/share";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -42,7 +42,7 @@ export default async function DocumentViewPage({
     await Promise.all([
     supabase
       .from("documents")
-      .select("*, clients(id, name, phone, email, address, gstin, state_code, state_name)")
+      .select("*, clients(*)")
       .eq("id", params.id)
       .maybeSingle(),
     supabase.from("line_items").select("*").eq("document_id", params.id).order("position"),
@@ -62,7 +62,12 @@ export default async function DocumentViewPage({
 
   const isInvoice = doc.type === "invoice";
   const gstOn = (profile?.gst_enabled ?? false) && Number(doc.gst_amount) > 0;
-  const title = isInvoice ? (gstOn ? t.taxInvoice : "INVOICE") : "ESTIMATE";
+  // English only: this title is printed on the customer's copy.
+  const title = isInvoice
+    ? gstOn
+      ? docLabels.taxInvoice
+      : docLabels.invoice
+    : docLabels.estimate;
 
   // Recompute from the stored line items so the printed page can never
   // disagree with the numbers, even for older bills.
@@ -112,6 +117,7 @@ export default async function DocumentViewPage({
     email: string;
     address: string;
     gstin: string | null;
+    pan: string | null;
     state_code: string;
     state_name: string;
   } | null;
@@ -128,26 +134,72 @@ export default async function DocumentViewPage({
     if (uri) qrSvg = await upiQrSvg(uri);
   }
 
+  // The grid rows, with the tax split out per line and every column
+  // reconciled against `totals` — so what the customer adds up on the
+  // page is what the foot of the page says.
+  const rows = computeLineTaxes(
+    (items ?? []).map((i) => ({
+      description: i.description,
+      qty: Number(i.qty),
+      unit: i.unit,
+      rate: Number(i.rate),
+      amount: Number(i.amount),
+      hsn_sac: i.hsn_sac ?? "",
+      gst_rate: Number(i.gst_rate ?? 0),
+      section: ((i.section as string) ?? "").trim(),
+    })),
+    totals,
+    {
+      fallbackRate: Number(profile?.gst_rate ?? 0.18),
+      serviceChargeLabel: doc.service_charge_label || "Service Charge",
+    }
+  );
+
   // His big estimates are named parts, each with its own subtotal — and he
   // writes a separate summary sheet listing just those figures. An empty
   // section means a plain bill, which is most of them.
-  const parts: { name: string; lines: NonNullable<typeof items>; total: number }[] = [];
-  for (const li of items ?? []) {
-    const name = ((li.section as string) ?? "").trim();
-    let group = parts.find((g) => g.name === name);
+  const rowGroups: { name: string; rows: typeof rows; taxable: number }[] = [];
+  for (const r of rows) {
+    const name = (r.section ?? "").trim();
+    let group = rowGroups.find((g) => g.name === name);
     if (!group) {
-      group = { name, lines: [], total: 0 };
-      parts.push(group);
+      group = { name, rows: [], taxable: 0 };
+      rowGroups.push(group);
     }
-    group.lines.push(li);
-    group.total += Number(li.amount);
+    group.rows.push(r);
+    group.taxable = Math.round((group.taxable + r.taxable) * 100) / 100;
   }
-  const hasParts = parts.filter((g) => g.name).length > 1;
+  const hasParts = rowGroups.filter((g) => g.name).length > 1;
+
+  // What the sheet prints. The stored total is what the app's own money
+  // screens work from, but the sheet recomputes from the line items — see
+  // "Line items are the source of truth" — so every figure printed below
+  // is taken from `totals`, and the grid, the words and the ladder can
+  // never disagree with each other on the page.
+  const printedTotal = totals.total;
+  const printedBalance = Math.round((printedTotal - received) * 100) / 100;
+
+  // He totals the quantity column the way his accountant's sheet does.
+  const totalQty = rows.reduce((s2, r) => s2 + r.qty, 0);
+  // Sr · Description · [HSN] · Qty · Rate · Taxable · [tax columns] · [Total]
+  const gridCols = gstOn ? (totals.interState ? 9 : 11) : 5;
 
   // A lockup file already carries the business name, so printing the name
   // as text beside it would say it twice.
   const logoUrl = (profile?.logo_url ?? "").trim();
   const logoHasName = logoUrl.includes("lockup");
+
+  const clientStateName =
+    client?.state_name || STATES.find((st) => st.code === client?.state_code)?.name || "";
+
+  // The standing wording at the foot. Falls back to the older single-line
+  // terms field so a profile that has never had the block filled in still
+  // prints something.
+  const termsText = (
+    profile?.terms ||
+    (isInvoice ? profile?.payment_terms : profile?.estimate_validity_note) ||
+    ""
+  ).trim();
 
   const placeOfSupplyName =
     STATES.find((s) => s.code === doc.place_of_supply)?.name ||
@@ -413,104 +465,148 @@ export default async function DocumentViewPage({
       )}
 
       {/* ---------- the printable document ----------
-           One ruled sheet. Every label comes from docLabels, which is
-           English only: this is the piece of paper his client, and their
-           accountant, will read. Do not reach for `t` below this line. */}
-      <div className="doc">
-        <p className="doc-title">{title}</p>
+           Modelled on the GST tax invoice his accountant already issues:
+           letterhead, a ruled grid that carries the tax per line, and a
+           foot that puts the bank, the terms and the signature where a
+           clerk expects to find them.
 
-        {/* who is billing · the bill's own numbers */}
-        <div className="doc-head">
+           Every label comes from docLabels, which is English only: this
+           is the piece of paper his client, and their accountant, will
+           read. Do not reach for `t` below this line. */}
+      <div className="doc">
+        {/* letterhead: who is billing, and how to reach him */}
+        <div className="doc-letterhead">
           <div className="doc-cell">
-            {logoUrl ? (
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoUrl}
-                  alt={profile?.business_name ?? ""}
-                  className={logoHasName ? "h-12 w-auto" : "h-11 w-auto"}
-                />
-                {!logoHasName && (
-                  <p className="text-lg font-extrabold leading-tight">
-                    {profile?.business_name}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-lg font-extrabold leading-tight">{profile?.business_name}</p>
-            )}
-            {profile?.proprietor_name && (
-              <p className="text-[0.8rem] text-stone-600">{profile.proprietor_name}</p>
-            )}
-            <p className="mt-1 text-[0.8rem] leading-snug text-stone-600">
+            <div className="doc-brand">
+              {logoUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={logoUrl} alt="" className="doc-logo" />
+              )}
+              {!logoHasName && (
+                <p className="doc-business">{profile?.business_name}</p>
+              )}
+            </div>
+            <p className="doc-address">
               {profile?.address}
               {profile?.city_pin ? `, ${profile.city_pin}` : ""}
             </p>
-            <p className="text-[0.8rem] text-stone-600">
-              {profile?.phone}
-              {profile?.email ? ` · ${profile.email}` : ""}
-            </p>
-            {profile?.gst_enabled && profile?.gstin && (
-              <p className="mt-1 text-[0.8rem] font-bold">GSTIN: {profile.gstin}</p>
-            )}
           </div>
 
-          <div className="doc-cell">
-            <p className="doc-kv">
-              <span>{isInvoice ? "Invoice No." : "Estimate No."}</span>
-              <span className="tnum">{doc.serial_no}</span>
-            </p>
-            <p className="doc-kv">
-              <span>Date</span>
-              <span className="tnum">{formatDate(doc.doc_date)}</span>
-            </p>
-            {gstOn && placeOfSupplyName && (
-              <p className="doc-kv">
-                <span>Place of supply</span>
-                <span>
-                  {placeOfSupplyName}
-                  {doc.place_of_supply ? ` (${doc.place_of_supply})` : ""}
-                </span>
+          <div className="doc-cell doc-contact">
+            {profile?.proprietor_name && (
+              <p>
+                <span>Name</span> : {profile.proprietor_name}
               </p>
             )}
-            {isInvoice && linkedEstimateSerial && (
-              <p className="doc-kv">
-                <span>Ref. estimate</span>
-                <span className="tnum">{linkedEstimateSerial}</span>
+            {profile?.phone && (
+              <p>
+                <span>{docLabels.phone}</span> : {profile.phone}
               </p>
             )}
-            {/* A customer copy must never read "Draft". The only status
-                worth printing is that the money arrived. */}
-            {isInvoice && received > 0 && (
-              <p className="doc-kv">
-                <span />
-                <span className="text-[0.95rem] font-extrabold tracking-widest">
-                  {balance <= 0.005 ? docLabels.paid : docLabels.partPaid}
-                </span>
+            {profile?.email && (
+              <p>
+                <span>Email</span> : {profile.email}
               </p>
             )}
           </div>
         </div>
 
-        {/* who it is for · what the job was */}
-        <div className={doc.site_job ? "doc-head" : "doc-head doc-head-single"}>
+        {/* the banner: GSTIN · what this paper is · which copy */}
+        <div className="doc-banner">
+          <div className="doc-banner-side">
+            {gstOn && profile?.gstin ? `GSTIN : ${profile.gstin}` : ""}
+          </div>
+          <p className="doc-banner-title">{title}</p>
+          <div className="doc-banner-side doc-banner-right">
+            {isInvoice ? docLabels.originalFor : ""}
+          </div>
+        </div>
+
+        {/* who it is for · the bill's own numbers */}
+        <div className="doc-parties">
           <div className="doc-cell">
-            <p className="doc-eyebrow">Bill To</p>
-            <p className="mt-1 font-extrabold">{client?.name ?? "—"}</p>
-            {client?.address && (
-              <p className="text-[0.8rem] leading-snug text-stone-600">{client.address}</p>
-            )}
-            {client?.phone && <p className="text-[0.8rem] text-stone-600">{client.phone}</p>}
-            {gstOn && client?.gstin && (
-              <p className="text-[0.8rem] font-semibold">GSTIN: {client.gstin}</p>
+            <p className="doc-eyebrow">{docLabels.customerDetail}</p>
+            <dl className="doc-dl mt-1">
+              <dt>{docLabels.ms}</dt>
+              <dd className="font-bold">{client?.name ?? "—"}</dd>
+              {client?.address && (
+                <>
+                  <dt>{docLabels.address}</dt>
+                  <dd>{client.address}</dd>
+                </>
+              )}
+              {client?.phone && (
+                <>
+                  <dt>{docLabels.phone}</dt>
+                  <dd className="tnum">{client.phone}</dd>
+                </>
+              )}
+              {gstOn && client?.gstin && (
+                <>
+                  <dt>GSTIN</dt>
+                  <dd className="tnum font-semibold">{client.gstin}</dd>
+                </>
+              )}
+              {client?.pan && (
+                <>
+                  <dt>{docLabels.pan}</dt>
+                  <dd className="tnum">{client.pan}</dd>
+                </>
+              )}
+              {clientStateName && (
+                <>
+                  <dt>{docLabels.state}</dt>
+                  <dd>
+                    {clientStateName}
+                    {client?.state_code ? ` ( ${client.state_code} )` : ""}
+                  </dd>
+                </>
+              )}
+              {gstOn && placeOfSupplyName && (
+                <>
+                  <dt>{docLabels.placeOfSupply}</dt>
+                  <dd>
+                    {placeOfSupplyName}
+                    {doc.place_of_supply ? ` ( ${doc.place_of_supply} )` : ""}
+                  </dd>
+                </>
+              )}
+            </dl>
+            {doc.site_job && (
+              <>
+                <p className="doc-eyebrow mt-3">Site / Job</p>
+                <p className="mt-0.5 text-[0.82rem] leading-snug">{doc.site_job}</p>
+              </>
             )}
           </div>
-          {doc.site_job && (
-            <div className="doc-cell">
-              <p className="doc-eyebrow">Site / Job</p>
-              <p className="mt-1 text-[0.85rem] leading-snug">{doc.site_job}</p>
-            </div>
-          )}
+
+          <div className="doc-cell">
+            <dl className="doc-dl">
+              <dt>{isInvoice ? docLabels.invoiceNo : docLabels.estimateNo}</dt>
+              <dd className="tnum font-bold">{doc.serial_no}</dd>
+              <dt>{isInvoice ? docLabels.invoiceDate : docLabels.estimateDate}</dt>
+              <dd className="tnum">{formatDate(doc.doc_date)}</dd>
+              {doc.due_date && (
+                <>
+                  <dt>{docLabels.dueDate}</dt>
+                  <dd className="tnum">{formatDate(doc.due_date)}</dd>
+                </>
+              )}
+              {isInvoice && linkedEstimateSerial && (
+                <>
+                  <dt>{docLabels.refEstimate}</dt>
+                  <dd className="tnum">{linkedEstimateSerial}</dd>
+                </>
+              )}
+            </dl>
+            {/* A customer copy must never read "Draft". The only status
+                worth printing is that the money arrived. */}
+            {isInvoice && received > 0 && (
+              <p className="doc-stamp">
+                {printedBalance <= 0.005 ? docLabels.paid : docLabels.partPaid}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* The four-line summary he writes on a separate sheet. Printed
@@ -521,7 +617,7 @@ export default async function DocumentViewPage({
             <p className="doc-eyebrow">{docLabels.partsSummary}</p>
             <table className="doc-table doc-table-fixed mt-1">
               <tbody>
-                {parts
+                {rowGroups
                   .filter((g) => g.name)
                   .map((g, i) => (
                     <tr key={g.name}>
@@ -529,7 +625,7 @@ export default async function DocumentViewPage({
                         {i + 1}
                       </td>
                       <td>{g.name}</td>
-                      <td className="doc-num">{formatIndianNumber(g.total)}</td>
+                      <td className="doc-num">{formatIndianNumber(g.taxable)}</td>
                     </tr>
                   ))}
               </tbody>
@@ -537,110 +633,281 @@ export default async function DocumentViewPage({
           </div>
         )}
 
-        {/* the items — on a phone as blocks, because the table pushed the
-            amount off the right edge; on paper always the ruled table */}
+        {/* the items — on a phone as blocks, because the ruled grid pushes
+            the amount off the right edge; on paper always the grid */}
         <div className="doc-lines">
-          {parts.map((group) => (
+          {rowGroups.map((group) => (
             <div key={group.name || "_"}>
               {hasParts && group.name && (
                 <p className="doc-part-row">
                   <span>{group.name}</span>
-                  <span className="tnum">{formatINR(group.total)}</span>
+                  <span className="tnum">{formatINR(group.taxable)}</span>
                 </p>
               )}
-              {group.lines.map((i, idx) => (
-            <div key={i.id} className="doc-line-row">
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-[0.9rem] font-semibold leading-snug">
-                  {idx + 1}. {i.description}
-                </span>
-                <span className="tnum shrink-0 font-extrabold">
-                  {formatINR(Number(i.amount))}
-                </span>
-              </div>
-              <p className="tnum mt-0.5 text-[0.78rem] text-stone-600">
-                {formatIndianNumber(Number(i.qty), 0)} {i.unit} × {formatINR(Number(i.rate))}
-                {gstOn && i.hsn_sac ? ` · ${docLabels.hsn} ${i.hsn_sac}` : ""}
-              </p>
-            </div>
+              {group.rows.map((r, idx) => (
+                <div key={`${group.name}-${idx}`} className="doc-line-row">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-[0.9rem] font-semibold leading-snug">
+                      {idx + 1}. {r.description}
+                    </span>
+                    <span className="tnum shrink-0 font-extrabold">
+                      {formatINR(gstOn ? r.total : r.taxable)}
+                    </span>
+                  </div>
+                  <p className="tnum mt-0.5 text-[0.78rem] text-stone-600">
+                    {formatIndianNumber(r.qty, 0)} {r.unit} × {formatINR(r.rate)}
+                    {gstOn ? ` · +${(r.gstRate * 100).toFixed(0)}% GST` : ""}
+                    {gstOn && r.hsn_sac ? ` · ${docLabels.hsn} ${r.hsn_sac}` : ""}
+                  </p>
+                </div>
               ))}
             </div>
           ))}
-          {(items ?? []).length === 0 && (
+          {rows.length === 0 && (
             <p className="doc-line-row text-center text-stone-500">—</p>
           )}
         </div>
 
-        <div className="doc-table-wrap overflow-x-auto">
-          <table className="doc-table">
+        <div className="doc-table-wrap">
+          <table className="doc-table doc-grid">
             <thead>
               <tr>
-                <th className="w-9">Sr</th>
-                <th>Description</th>
-                {gstOn && <th>{docLabels.hsn}</th>}
-                <th className="doc-num">Qty</th>
-                <th>Unit</th>
-                <th className="doc-num">Rate (₹)</th>
-                <th className="doc-num">Amount (₹)</th>
+                <th rowSpan={2} className="doc-grid-sr">
+                  {docLabels.srNo}
+                </th>
+                <th rowSpan={2}>{docLabels.productService}</th>
+                {gstOn && <th rowSpan={2}>{docLabels.hsn}</th>}
+                <th rowSpan={2} className="doc-num">
+                  {docLabels.qty}
+                </th>
+                <th rowSpan={2} className="doc-num">
+                  {docLabels.rate}
+                </th>
+                <th rowSpan={2} className="doc-num">
+                  {gstOn ? docLabels.taxableValue : docLabels.amount}
+                </th>
+                {gstOn &&
+                  (totals.interState ? (
+                    <th colSpan={2} className="doc-grid-group">
+                      {docLabels.igst}
+                    </th>
+                  ) : (
+                    <>
+                      <th colSpan={2} className="doc-grid-group">
+                        {docLabels.cgst}
+                      </th>
+                      <th colSpan={2} className="doc-grid-group">
+                        {docLabels.sgst}
+                      </th>
+                    </>
+                  ))}
+                {gstOn && (
+                  <th rowSpan={2} className="doc-num">
+                    {docLabels.total}
+                  </th>
+                )}
+              </tr>
+              <tr>
+                {gstOn && (
+                  <>
+                    <th className="doc-num doc-grid-pct">{docLabels.percent}</th>
+                    <th className="doc-num">{docLabels.amount}</th>
+                    {!totals.interState && (
+                      <>
+                        <th className="doc-num doc-grid-pct">{docLabels.percent}</th>
+                        <th className="doc-num">{docLabels.amount}</th>
+                      </>
+                    )}
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
-              {parts.map((group) => (
+              {rowGroups.map((group) => (
                 <Fragment key={group.name || "_"}>
                   {hasParts && group.name && (
                     <tr className="doc-part">
-                      <th colSpan={gstOn ? 6 : 5} scope="colgroup">
+                      <th colSpan={gridCols - 1} scope="colgroup">
                         {group.name}
                       </th>
-                      <th className="doc-num">{formatIndianNumber(group.total)}</th>
+                      <th className="doc-num">{formatIndianNumber(group.taxable)}</th>
                     </tr>
                   )}
-                  {group.lines.map((i, idx) => (
-                    <tr key={i.id}>
+                  {group.rows.map((r, idx) => (
+                    <tr key={`${group.name}-${idx}`}>
                       <td className="tnum">{idx + 1}</td>
-                      <td>{i.description}</td>
-                      {gstOn && <td className="tnum">{i.hsn_sac || "—"}</td>}
-                      <td className="doc-num">{formatIndianNumber(Number(i.qty), 0)}</td>
-                      <td>{i.unit}</td>
-                      <td className="doc-num">{formatIndianNumber(Number(i.rate))}</td>
-                      <td className="doc-num">{formatIndianNumber(Number(i.amount))}</td>
+                      <td>{r.description}</td>
+                      {gstOn && <td className="tnum">{r.hsn_sac || "—"}</td>}
+                      <td className="doc-num">
+                        {formatIndianNumber(r.qty, 0)} {r.unit}
+                      </td>
+                      <td className="doc-num">{formatIndianNumber(r.rate)}</td>
+                      <td className="doc-num">{formatIndianNumber(r.taxable)}</td>
+                      {gstOn &&
+                        (totals.interState ? (
+                          <>
+                            <td className="doc-num doc-grid-pct">
+                              {(r.gstRate * 100).toFixed(2)}
+                            </td>
+                            <td className="doc-num">{formatIndianNumber(r.igst)}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="doc-num doc-grid-pct">
+                              {((r.gstRate * 100) / 2).toFixed(2)}
+                            </td>
+                            <td className="doc-num">{formatIndianNumber(r.cgst)}</td>
+                            <td className="doc-num doc-grid-pct">
+                              {((r.gstRate * 100) / 2).toFixed(2)}
+                            </td>
+                            <td className="doc-num">{formatIndianNumber(r.sgst)}</td>
+                          </>
+                        ))}
+                      {gstOn && (
+                        <td className="doc-num font-semibold">
+                          {formatIndianNumber(r.total)}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </Fragment>
               ))}
-              {(items ?? []).length === 0 && (
+              {rows.length === 0 && (
                 <tr>
-                  <td colSpan={gstOn ? 7 : 6} className="text-center text-stone-500">
+                  <td colSpan={gridCols} className="text-center text-stone-500">
                     —
                   </td>
                 </tr>
               )}
+              {/* Runs the grid down the page the way a printed form does,
+                  so a four-line bill still reads as a document. */}
+              <tr className="doc-grid-filler" aria-hidden>
+                <td colSpan={gridCols} />
+              </tr>
             </tbody>
+            <tfoot>
+              <tr className="doc-grid-total">
+                <td colSpan={gstOn ? 3 : 2}>{docLabels.total}</td>
+                <td className="doc-num">{formatIndianNumber(totalQty, 2)}</td>
+                <td />
+                <td className="doc-num">{formatIndianNumber(totals.taxableValue)}</td>
+                {gstOn &&
+                  (totals.interState ? (
+                    <>
+                      <td />
+                      <td className="doc-num">{formatIndianNumber(totals.igst)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td />
+                      <td className="doc-num">{formatIndianNumber(totals.cgst)}</td>
+                      <td />
+                      <td className="doc-num">{formatIndianNumber(totals.sgst)}</td>
+                    </>
+                  ))}
+                {gstOn && (
+                  <td className="doc-num">{formatIndianNumber(totals.total)}</td>
+                )}
+              </tr>
+            </tfoot>
           </table>
         </div>
 
-        {/* amount in words · the money */}
-        <div className="doc-summary print-avoid-break">
-          <div className="doc-cell">
-            <p className="doc-eyebrow">Amount in words</p>
-            <p className="mt-1 text-[0.85rem] font-semibold leading-snug">
-              {amountInWords(Number(doc.total))}
-            </p>
-            {doc.notes && (
-              <>
-                <p className="doc-eyebrow mt-3">Notes</p>
-                <p className="mt-1 text-[0.8rem] leading-snug text-stone-700">{doc.notes}</p>
-              </>
+        {/* the foot: what it says in words, how to pay, the terms —
+            against the money ladder and the signature */}
+        <div className="doc-foot">
+          <div className="doc-foot-left">
+            <div className="doc-cell">
+              <p className="doc-eyebrow">{docLabels.totalInWords}</p>
+              <p className="mt-1 text-[0.84rem] font-semibold uppercase leading-snug">
+                {amountInWords(printedTotal)}
+              </p>
+            </div>
+
+            {(profile?.bank_name || profile?.upi_id) && (
+              <div className="doc-cell doc-foot-rule">
+                <p className="doc-eyebrow">{docLabels.bankDetails}</p>
+                <div className="mt-1 flex flex-wrap items-start gap-4">
+                  <dl className="doc-dl min-w-[11rem] flex-1">
+                    {profile?.bank_name && (
+                      <>
+                        <dt>{docLabels.bankName}</dt>
+                        <dd>{profile.bank_name}</dd>
+                      </>
+                    )}
+                    {profile?.bank_branch && (
+                      <>
+                        <dt>{docLabels.branch}</dt>
+                        <dd>{profile.bank_branch}</dd>
+                      </>
+                    )}
+                    {profile?.account_no && (
+                      <>
+                        <dt>{docLabels.accountNo}</dt>
+                        <dd className="tnum">{profile.account_no}</dd>
+                      </>
+                    )}
+                    {profile?.ifsc && (
+                      <>
+                        <dt>{docLabels.ifsc}</dt>
+                        <dd className="tnum">{profile.ifsc}</dd>
+                      </>
+                    )}
+                    {profile?.upi_id && (
+                      <>
+                        <dt>UPI</dt>
+                        <dd className="tnum">{profile.upi_id}</dd>
+                      </>
+                    )}
+                  </dl>
+
+                  {qrSvg && (
+                    <div className="text-center">
+                      <div
+                        className="doc-qr mx-auto"
+                        // The QR is generated on the server; nothing here is user input.
+                        dangerouslySetInnerHTML={{ __html: qrSvg }}
+                      />
+                      <p className="mt-1 text-[0.66rem] font-bold text-stone-700">
+                        {docLabels.scanToPay}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {(termsText || doc.notes) && (
+              <div className="doc-cell doc-foot-rule">
+                {termsText && (
+                  <>
+                    <p className="doc-eyebrow">{docLabels.terms}</p>
+                    <p className="mt-1 whitespace-pre-line text-[0.74rem] leading-snug text-stone-700">
+                      {termsText}
+                    </p>
+                  </>
+                )}
+                {doc.notes && (
+                  <>
+                    <p className={`doc-eyebrow ${termsText ? "mt-2" : ""}`}>
+                      {docLabels.notes}
+                    </p>
+                    <p className="mt-1 text-[0.76rem] leading-snug text-stone-700">
+                      {doc.notes}
+                    </p>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
-          <div className="doc-cell">
-            {totals.serviceCharge > 0 ? (
-              <>
-                <p className="doc-line">
-                  <span>Subtotal</span>
-                  <span className="tnum">{formatINR(totals.subtotal)}</span>
-                </p>
+          <div className="doc-foot-right">
+            <div className="doc-ladder">
+              <p className="doc-line">
+                <span>{gstOn ? docLabels.taxableAmount : docLabels.subtotal}</span>
+                <span className="tnum">{formatIndianNumber(totals.subtotal)}</span>
+              </p>
+              {totals.serviceCharge > 0 && (
                 <p className="doc-line">
                   <span>
                     {doc.service_charge_label || "Service Charge"}
@@ -648,153 +915,70 @@ export default async function DocumentViewPage({
                       ? ` (${formatIndianNumber(Number(doc.service_charge_value), 0)}%)`
                       : ""}
                   </span>
-                  <span className="tnum">{formatINR(totals.serviceCharge)}</span>
+                  <span className="tnum">{formatIndianNumber(totals.serviceCharge)}</span>
                 </p>
-                {gstOn && (
-                  <p className="doc-line font-semibold">
-                    <span>{docLabels.taxableValue}</span>
-                    <span className="tnum">{formatINR(totals.taxableValue)}</span>
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="doc-line">
-                <span>{gstOn ? docLabels.taxableValue : docLabels.subtotal}</span>
-                <span className="tnum">{formatINR(totals.taxableValue)}</span>
-              </p>
-            )}
-
-            {gstOn &&
-              (totals.interState ? (
-                <p className="doc-line">
-                  <span>{docLabels.igst}</span>
-                  <span className="tnum">{formatINR(totals.igst)}</span>
-                </p>
-              ) : (
+              )}
+              {gstOn && (
                 <>
-                  <p className="doc-line">
-                    <span>{docLabels.cgst}</span>
-                    <span className="tnum">{formatINR(totals.cgst)}</span>
-                  </p>
-                  <p className="doc-line">
-                    <span>{docLabels.sgst}</span>
-                    <span className="tnum">{formatINR(totals.sgst)}</span>
+                  {totals.interState ? (
+                    <p className="doc-line">
+                      <span>{docLabels.addIgst}</span>
+                      <span className="tnum">{formatIndianNumber(totals.igst)}</span>
+                    </p>
+                  ) : (
+                    <>
+                      <p className="doc-line">
+                        <span>{docLabels.addCgst}</span>
+                        <span className="tnum">{formatIndianNumber(totals.cgst)}</span>
+                      </p>
+                      <p className="doc-line">
+                        <span>{docLabels.addSgst}</span>
+                        <span className="tnum">{formatIndianNumber(totals.sgst)}</span>
+                      </p>
+                    </>
+                  )}
+                  <p className="doc-line doc-line-rule">
+                    <span>{docLabels.totalTax}</span>
+                    <span className="tnum">{formatIndianNumber(totals.gstAmount)}</span>
                   </p>
                 </>
-              ))}
+              )}
+              <p className="doc-line doc-line-total">
+                <span>{gstOn ? docLabels.totalAfterTax : docLabels.total}</span>
+                <span className="tnum">{formatINR(printedTotal)}</span>
+              </p>
 
-            <p className="doc-line doc-line-total">
-              <span>{docLabels.total}</span>
-              <span className="tnum">{formatINR(Number(doc.total))}</span>
-            </p>
-
-            {isInvoice && received > 0 && (
-              <>
-                <p className="doc-line">
-                  <span>{docLabels.received}</span>
-                  <span className="tnum">− {formatINR(received)}</span>
-                </p>
-                <p className="doc-line font-extrabold">
-                  <span>{balance > 0 ? docLabels.balanceDue : docLabels.fullySettled}</span>
-                  <span className="tnum">{formatINR(balance)}</span>
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* tax summary by slab — required on a proper tax invoice */}
-        {gstOn && totals.slabs.length > 0 && (
-          <div className="print-avoid-break border-t border-[color:var(--doc-rule)]">
-            <p className="doc-eyebrow px-[0.9rem] pt-2">{docLabels.taxSummary}</p>
-            <div className="overflow-x-auto pt-1">
-              <table className="doc-table doc-table-fixed">
-                <thead>
-                  <tr>
-                    <th>Rate</th>
-                    <th className="doc-num">{docLabels.taxableValue} (₹)</th>
-                    {totals.interState ? (
-                      <th className="doc-num">{docLabels.igst} (₹)</th>
-                    ) : (
-                      <>
-                        <th className="doc-num">{docLabels.cgst} (₹)</th>
-                        <th className="doc-num">{docLabels.sgst} (₹)</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {totals.slabs.map((sl) => (
-                    <tr key={sl.rate}>
-                      <td className="tnum">{(sl.rate * 100).toFixed(0)}%</td>
-                      <td className="doc-num">{formatIndianNumber(sl.taxable)}</td>
-                      {totals.interState ? (
-                        <td className="doc-num">{formatIndianNumber(sl.igst)}</td>
-                      ) : (
-                        <>
-                          <td className="doc-num">{formatIndianNumber(sl.cgst)}</td>
-                          <td className="doc-num">{formatIndianNumber(sl.sgst)}</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {isInvoice && received > 0 && (
+                <>
+                  <p className="doc-line">
+                    <span>{docLabels.received}</span>
+                    <span className="tnum">− {formatIndianNumber(received)}</span>
+                  </p>
+                  <p className="doc-line font-extrabold">
+                    <span>
+                      {printedBalance > 0 ? docLabels.balanceDue : docLabels.fullySettled}
+                    </span>
+                    <span className="tnum">{formatINR(printedBalance)}</span>
+                  </p>
+                </>
+              )}
+              <p className="doc-eoe">{docLabels.errorsExcepted}</p>
             </div>
-          </div>
-        )}
 
-        {/* how to pay · who signed */}
-        <div className="doc-foot print-avoid-break">
-          <div className="doc-cell">
-            {(profile?.bank_name || profile?.upi_id) && (
-              <>
-                <p className="doc-eyebrow">How to pay</p>
-                <div className="mt-1 flex flex-wrap items-start gap-4">
-                  <div className="min-w-[9rem] flex-1 text-[0.8rem] leading-snug text-stone-700">
-                    {profile?.bank_name && (
-                      <>
-                        <p className="font-semibold">{profile.bank_name}</p>
-                        {profile.account_no && <p className="tnum">A/c {profile.account_no}</p>}
-                        {profile.ifsc && <p className="tnum">IFSC {profile.ifsc}</p>}
-                      </>
-                    )}
-                    {profile?.upi_id && <p className="mt-1">UPI: {profile.upi_id}</p>}
-                  </div>
-
-                  {qrSvg && (
-                    <div className="text-center">
-                      <div
-                        className="mx-auto h-[112px] w-[112px]"
-                        // The QR is generated on the server; nothing here is user input.
-                        dangerouslySetInnerHTML={{ __html: qrSvg }}
-                      />
-                      <p className="mt-1 text-[0.68rem] font-bold text-stone-700">{docLabels.scanToPay}</p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-            <p className="mt-2 text-[0.7rem] leading-snug text-stone-500">
-              {isInvoice ? profile?.payment_terms : profile?.estimate_validity_note}
-            </p>
-            {isInvoice && profile?.invoice_footer_note && (
-              <p className="mt-1 text-[0.7rem] leading-snug text-stone-500">
-                {profile.invoice_footer_note}
+            <div className="doc-sign">
+              <p className="text-[0.66rem] leading-snug text-stone-500">
+                {docLabels.certified}
               </p>
-            )}
-          </div>
-
-          <div className="doc-cell text-right">
-            <p className="text-[0.75rem] text-stone-600">
-              {docLabels.signFor} <span className="font-extrabold text-ink">{profile?.business_name}</span>
-            </p>
-            <p className="doc-sign-line ml-auto inline-block px-8">Authorised Signature</p>
-            {!isInvoice && (
-              <p className="mt-4 text-left text-[0.7rem] text-stone-600">
-                {docLabels.approvedBy}: ____________________ &nbsp; Date: __________
+              <p className="mt-1 text-[0.85rem] font-extrabold">
+                {docLabels.signFor} {profile?.business_name}
               </p>
-            )}
+              <p className="doc-sign-line">{docLabels.authorisedSignatory}</p>
+              {!isInvoice && (
+                <p className="mt-3 text-left text-[0.7rem] text-stone-600">
+                  {docLabels.approvedBy}: ____________________ &nbsp; Date: __________
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>

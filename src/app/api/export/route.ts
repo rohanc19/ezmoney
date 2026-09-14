@@ -18,6 +18,8 @@ const TABLES: Record<string, { table: string; order: string }> = {
   shops: { table: "shops", order: "name" },
   item_prices: { table: "item_prices", order: "seen_on" },
   rate_card_items: { table: "rate_card_items", order: "description" },
+  checklists: { table: "checklists", order: "created_at" },
+  checklist_items: { table: "checklist_items", order: "checklist_id" },
   business_profile: { table: "business_profile", order: "user_id" },
 };
 

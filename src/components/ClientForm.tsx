@@ -80,6 +80,12 @@ export default function ClientForm({
             </label>
             <input id="gstin" name="gstin" defaultValue={client?.gstin ?? ""} className="field" />
           </div>
+          <div>
+            <label className="label" htmlFor="pan">
+              {t.clientPan}
+            </label>
+            <input id="pan" name="pan" defaultValue={client?.pan ?? ""} className="field" />
+          </div>
         </div>
       )}
       <div>
