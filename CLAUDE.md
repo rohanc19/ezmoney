@@ -126,11 +126,12 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   the date in local time; `mondayOf` and `addDays` go through it.
 - **The working week runs Monday to Saturday and settles on Saturday.**
   His men are on a daily wage, take advances during the week, and are paid
-  the balance on Saturday, so the worker page leads with a week: tap a day
-  to record it at his wage, tap again to take it back. Taking a day back
-  only works when that day holds a single ordinary day — anything longer or
-  a lump sum is left for the book below, because silently deleting a
-  ₹25,000 line would be unforgivable.
+  the balance on Saturday. The worker page is that week; a day cell opens
+  `/labour/[id]/day/[date]`, which holds everything about one man on one
+  day — where he worked, what he took as an advance, what he was paid.
+  There is deliberately no ledger list on the worker page: the week gives
+  the shape and the day gives the detail, so a flat list of every entry
+  ever was just noise in between.
 - **The labour book is a ledger, not a list.** `worker_entries` rows are
   `work` (what he owes) or `payment`/`advance` (money handed over); `amount`
   always holds the rupee figure so a balance is one sum. Payments there count

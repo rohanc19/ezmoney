@@ -775,9 +775,11 @@ export async function saveWorkerEntry(formData: FormData) {
   });
   if (error) throw error;
 
+  const back = String(formData.get("return_to") ?? "") || `/labour/${worker_id}`;
+  revalidatePath(back);
   revalidatePath(`/labour/${worker_id}`);
   revalidatePath("/labour");
-  redirect(`/labour/${worker_id}?saved=1`);
+  redirect(`${back}${back.includes("?") ? "&" : "?"}saved=1`);
 }
 
 export async function deleteWorkerEntry(formData: FormData) {
@@ -790,8 +792,11 @@ export async function deleteWorkerEntry(formData: FormData) {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw error;
+  const back = String(formData.get("return_to") ?? "") || `/labour/${worker_id}`;
+  revalidatePath(back);
   revalidatePath(`/labour/${worker_id}`);
-  redirect(`/labour/${worker_id}`);
+  revalidatePath("/labour");
+  redirect(back);
 }
 
 // ---------- bill scanner ----------
@@ -1057,55 +1062,42 @@ export async function deletePayment(formData: FormData) {
  * longer, or a lump sum, is left alone and edited in the book below,
  * because silently deleting a ₹25,000 lump would be unforgivable.
  */
-export async function toggleWorkDay(formData: FormData) {
+export async function markWorkedThisDay(formData: FormData) {
   const { supabase, user } = await requireUser();
   const worker_id = String(formData.get("worker_id") ?? "");
   const day = String(formData.get("day") ?? "");
   const week = String(formData.get("week") ?? "");
   if (!worker_id || !day) redirect("/labour");
 
-  const back = `/labour/${worker_id}${week ? `?week=${week}` : ""}`;
+  const back = String(formData.get("return_to") ?? "") ||
+    `/labour/${worker_id}${week ? `?week=${week}` : ""}`;
 
-  const [{ data: worker }, { data: existing }] = await Promise.all([
+  const [{ data: worker }] = await Promise.all([
     supabase
       .from("workers")
       .select("daily_rate")
       .eq("id", worker_id)
       .eq("user_id", user.id)
       .maybeSingle(),
-    supabase
-      .from("worker_entries")
-      .select("id, days, amount")
-      .eq("worker_id", worker_id)
-      .eq("user_id", user.id)
-      .eq("kind", "work")
-      .eq("entry_date", day),
   ]);
   if (!worker) redirect("/labour");
 
-  const rows = existing ?? [];
-  if (rows.length === 0) {
-    const rate = Number(worker.daily_rate) || 0;
-    if (rate <= 0) redirect(back); // no wage set yet — nothing to record
-    const { error } = await supabase.from("worker_entries").insert({
-      user_id: user.id,
-      worker_id,
-      entry_date: day,
-      kind: "work",
-      days: 1,
-      rate,
-      amount: rate,
-    });
-    if (error) throw error;
-  } else if (rows.length === 1 && Number(rows[0].days) <= 1) {
-    const { error } = await supabase
-      .from("worker_entries")
-      .delete()
-      .eq("id", rows[0].id)
-      .eq("user_id", user.id);
-    if (error) throw error;
-  }
+  const rate = Number(worker.daily_rate) || 0;
+  if (rate <= 0) redirect(back); // no wage set yet — nothing to record
 
+  const { error } = await supabase.from("worker_entries").insert({
+    user_id: user.id,
+    worker_id,
+    entry_date: day,
+    kind: "work",
+    days: 1,
+    rate,
+    amount: rate,
+    site_job: String(formData.get("site_job") ?? "").trim(),
+  });
+  if (error) throw error;
+
+  revalidatePath(back);
   revalidatePath(`/labour/${worker_id}`);
   revalidatePath("/labour");
   redirect(back);

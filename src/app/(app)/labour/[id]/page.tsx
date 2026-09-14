@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
-import {
-  deleteWorker,
-  deleteWorkerEntry,
-  payWeek,
-  saveWorkerEntry,
-  toggleWorkDay,
-} from "@/lib/actions";
+import { deleteWorker, payWeek } from "@/lib/actions";
 import {
   addDays,
   formatDate,
@@ -18,7 +12,7 @@ import {
 } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
-import { PAID_VIA, type WorkerEntry } from "@/lib/types";
+import type { WorkerEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -170,14 +164,16 @@ export default async function WorkerBookPage({
         ) : (
           <>
             <div className="mt-3 grid grid-cols-7 gap-1">
-              {dayTotals.map((d, i) => (
-                <form key={d.date} action={toggleWorkDay}>
-                  <input type="hidden" name="worker_id" value={worker.id} />
-                  <input type="hidden" name="day" value={d.date} />
-                  <input type="hidden" name="week" value={weekStart} />
-                  <button
-                    type="submit"
-                    className={`flex min-h-[58px] w-full flex-col items-center justify-center rounded-xl border-2 px-0.5 ${
+              {dayTotals.map((d, i) => {
+                const extras = inWeek.filter(
+                  (e) => e.entry_date === d.date && e.kind !== "work"
+                ).length;
+                return (
+                  <Link
+                    key={d.date}
+                    href={`/labour/${worker.id}/day/${d.date}`}
+                    aria-label={`${t.openTheDay} ${formatDayShort(d.date)}`}
+                    className={`flex min-h-[58px] flex-col items-center justify-center rounded-xl border-2 px-0.5 no-underline ${
                       d.days > 0
                         ? "border-accent bg-accent text-white"
                         : "border-line bg-white text-stone-500"
@@ -185,16 +181,27 @@ export default async function WorkerBookPage({
                   >
                     <span className="text-[0.62rem] font-bold uppercase">{t.daysShort[i]}</span>
                     <span className="text-[0.68rem]">{formatDayShort(d.date).split(" ")[0]}</span>
-                    {d.days > 0 && (
-                      <span className="tnum text-[0.6rem] font-bold">
-                        {d.days === 1 ? "✓" : d.days}
-                      </span>
-                    )}
-                  </button>
-                </form>
-              ))}
+                    <span className="flex h-[0.6rem] items-center gap-0.5">
+                      {d.days > 0 && (
+                        <span className="tnum text-[0.6rem] font-bold">
+                          {d.days === 1 ? "✓" : d.days}
+                        </span>
+                      )}
+                      {/* a dot means money moved that day */}
+                      {extras > 0 && (
+                        <span
+                          aria-hidden
+                          className={`h-1 w-1 rounded-full ${
+                            d.days > 0 ? "bg-white" : "bg-amber-500"
+                          }`}
+                        />
+                      )}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
-            <p className="mt-1.5 text-center text-xs text-stone-500">{t.tapDaysHint}</p>
+            <p className="mt-1.5 text-center text-xs text-stone-500">{t.openDayHint}</p>
 
             <dl className="mt-3 border-t border-line pt-2">
               <div className="flex justify-between py-0.5 text-sm">
@@ -267,208 +274,6 @@ export default async function WorkerBookPage({
           </p>
         </div>
       </div>
-
-      {/* ---- add a work day ---- */}
-      <details className="card mt-4 p-4">
-        <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-          + {t.addWork}
-        </summary>
-        <form action={saveWorkerEntry} className="mt-4 space-y-4">
-          <input type="hidden" name="worker_id" value={worker.id} />
-          <input type="hidden" name="kind" value="work" />
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="label" htmlFor="w_date">
-                {t.date}
-              </label>
-              <input id="w_date" type="date" name="entry_date" defaultValue={today} className="field" />
-            </div>
-            <div className="w-24">
-              <label className="label" htmlFor="w_days">
-                {t.days}
-              </label>
-              <input
-                id="w_days"
-                name="days"
-                inputMode="decimal"
-                defaultValue="1"
-                className="field tnum px-2"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="label" htmlFor="w_rate">
-              {t.dailyWage}
-            </label>
-            <input
-              id="w_rate"
-              name="rate"
-              inputMode="decimal"
-              defaultValue={Number(worker.daily_rate) > 0 ? String(worker.daily_rate) : ""}
-              className="field tnum"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="w_amount">
-              {t.orFixedAmount}
-            </label>
-            <input id="w_amount" name="amount" inputMode="decimal" className="field tnum" />
-          </div>
-          <div>
-            <label className="label" htmlFor="w_site">
-              {t.siteJob}
-            </label>
-            <input id="w_site" name="site_job" className="field" />
-          </div>
-          <div>
-            <label className="label" htmlFor="w_client">
-              {t.forClient}
-            </label>
-            <select id="w_client" name="client_id" className="field">
-              <option value="">—</option>
-              {(clients ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="btn-primary w-full">
-            {t.save}
-          </button>
-        </form>
-      </details>
-
-      {/* ---- pay money ---- */}
-      <details className="card mt-3 p-4">
-        <summary className="min-h-[44px] cursor-pointer list-none font-extrabold text-accent-dark">
-          + {t.addPayment}
-        </summary>
-        <form action={saveWorkerEntry} className="mt-4 space-y-4">
-          <input type="hidden" name="worker_id" value={worker.id} />
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="label" htmlFor="p_date">
-                {t.date}
-              </label>
-              <input id="p_date" type="date" name="entry_date" defaultValue={today} className="field" />
-            </div>
-            <div className="flex-1">
-              <label className="label" htmlFor="p_amount">
-                {t.amount} (₹)
-              </label>
-              <input
-                id="p_amount"
-                name="amount"
-                inputMode="decimal"
-                required
-                className="field tnum"
-              />
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="label" htmlFor="p_kind">
-                {t.category}
-              </label>
-              <select id="p_kind" name="kind" defaultValue="payment" className="field">
-                <option value="payment">{t.payment}</option>
-                <option value="advance">{t.advance}</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="label" htmlFor="p_via">
-                {t.paidVia}
-              </label>
-              <select id="p_via" name="paid_via" className="field">
-                {PAID_VIA.map((v) => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="label" htmlFor="p_notes">
-              {t.notes}
-            </label>
-            <input id="p_notes" name="notes" className="field" />
-          </div>
-          <button type="submit" className="btn-primary w-full">
-            {t.save}
-          </button>
-        </form>
-      </details>
-
-      <p className="mt-2 text-center text-xs text-stone-500">{t.labourCountedNote}</p>
-
-      {/* ---- the book ---- */}
-      <h2 className="eyebrow mt-7">{t.workerBook}</h2>
-      {entries.length === 0 ? (
-        <p className="card mt-3 p-6 text-center text-stone-600">{t.noEntriesYet}</p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {entries.map((e) => {
-            const isWork = e.kind === "work";
-            return (
-              <li key={e.id} className="card p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="min-w-0">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        isWork
-                          ? "bg-stone-100 text-stone-700"
-                          : e.kind === "advance"
-                            ? "bg-amber-100 text-amber-900"
-                            : "bg-green-100 text-green-900"
-                      }`}
-                    >
-                      {kindLabel[e.kind]}
-                    </span>
-                    <span className="mt-1 block text-sm text-stone-500">
-                      {formatDate(e.entry_date)}
-                      {isWork && Number(e.days) > 0
-                        ? ` · ${
-                            Number(e.days) === 1
-                              ? t.oneDay
-                              : `${e.days} ${t.days.toLowerCase()}`
-                          } × ${formatINR(Number(e.rate), 0)}`
-                        : ""}
-                      {!isWork ? ` · ${e.paid_via}` : ""}
-                    </span>
-                    {(e.site_job || e.clients?.name) && (
-                      <span className="block truncate text-sm text-stone-600">
-                        {[e.clients?.name, e.site_job].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                    {e.notes && <span className="block text-sm text-stone-500">{e.notes}</span>}
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span
-                      className={`tnum block font-extrabold ${
-                        isWork ? "text-ink" : "text-green-800"
-                      }`}
-                    >
-                      {isWork ? "" : "− "}
-                      {formatINR(Number(e.amount), 0)}
-                    </span>
-                    <form action={deleteWorkerEntry}>
-                      <input type="hidden" name="id" value={e.id} />
-                      <input type="hidden" name="worker_id" value={worker.id} />
-                      <ConfirmButton
-                        message={t.confirmDeleteEntry}
-                      confirmLabel={t.tapAgain}
-                        className="mt-1 min-h-[36px] rounded-lg px-2 text-xs font-semibold text-red-700"
-                      >
-                        × {t.delete}
-                      </ConfirmButton>
-                    </form>
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
 
       <form action={deleteWorker} className="mt-8">
         <input type="hidden" name="id" value={worker.id} />
