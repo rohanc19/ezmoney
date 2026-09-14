@@ -77,6 +77,8 @@ supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, 
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
+supabase/rate_card_junk_cleanup.sql  the four rows in his list that are not items
+supabase/role_to_roll.sql           the unit "Role" -> "Roll" (run any time)
 src/middleware.ts                   session refresh + login redirect
 src/lib/actions.ts                  every server action
 src/lib/gst.ts                      tax computation (single source of truth)
@@ -277,6 +279,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   sensitively.** So the spelling fix updates first and merges only when
   Postgres actually returns 23505 — a looser comparison of our own
   (`ilike`) would delete rows that were never going to clash.
+- **Home warns when the same bill appears twice.** Two *invoices* sharing
+  a client, a date and an amount to the paisa are surfaced in "Needs your
+  attention". Estimates are excluded — quoting the same job twice is
+  normal. This is the safety net behind the guard below: the guard stops
+  new duplicates, the warning finds ones already on the books.
 - **One estimate, one invoice.** `convertToInvoice` checks for an invoice
   already linked to the estimate and goes to it rather than minting a
   second. He had ₹38,062 of one apartment job on the books twice —

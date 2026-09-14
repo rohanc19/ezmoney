@@ -21,7 +21,7 @@ export const UNITS = [
   "Coil",
   "Box",
   "Kg",
-  "Role",
+  "Roll",
   "Length",
   "Bag",
   "Set",
@@ -29,6 +29,13 @@ export const UNITS = [
   "Day",
   "Hrs",
   "Lump",
+  // "Role" was the spelling for two years — flexible pipe is sold by the
+  // roll — and it prints on the customer's copy, so it is "Roll" now.
+  // The old value stays in the list because it is stored on every line
+  // item that used it, and a unit missing from the list renders as a
+  // blank select. `supabase/role_to_roll.sql` moves the data across;
+  // after that nothing picks this, and nothing breaks if it is run late.
+  "Role",
 ] as const;
 export const EXPENSE_CATEGORIES = [
   "Materials", "Tools", "Transport", "Labour", "Fuel", "Consumables", "Rent", "Misc",

@@ -285,9 +285,9 @@ export default async function DocumentViewPage({
         )}
         {/* Everything he needs rarely. One primary action above; these
             stay reachable without competing with it. */}
-        <details className="card mb-4 p-3">
-          <summary className="min-h-[44px] cursor-pointer list-none px-1 font-bold text-stone-600">
-            {t.more}
+        <details className="mb-4">
+          <summary className="min-h-[44px] cursor-pointer list-none py-2 font-extrabold text-accent-dark">
+            + {t.more}
           </summary>
           <div className="mt-2 flex flex-wrap gap-2">
             <Link href={`/documents/${doc.id}/edit`} className="btn-secondary">

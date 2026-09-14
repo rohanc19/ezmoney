@@ -43,7 +43,7 @@ export default async function HomePage({
   const q = (searchParams.q ?? "").trim();
   const type =
     searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
-  const show = ["unpaid", "unbilled", "overdue", "awaiting", "drafts"].includes(
+  const show = ["unpaid", "unbilled", "overdue", "awaiting", "drafts", "duplicates"].includes(
     searchParams.show ?? ""
   )
     ? searchParams.show!
@@ -92,7 +92,28 @@ export default async function HomePage({
     (d) => d.status === "draft" && daysBetween(d.created_at.slice(0, 10)) > UNSENT_DAYS
   );
 
+  // The same bill twice. He had one apartment job on the books as both
+  // INV-2026-013 and -014 — same client, same day, same ₹38,062 — and
+  // both were counting towards what he was owed, silently, because the
+  // list shows them as two ordinary rows. Two invoices agreeing on the
+  // client, the day and the amount to the paisa is not a coincidence
+  // worth staying quiet about. Estimates are excluded: quoting the same
+  // job twice is normal.
+  const duplicates: HomeDoc[] = [];
+  const seen = new Map<string, HomeDoc>();
+  for (const d of invoices) {
+    const key = `${d.clients?.name ?? d.id}|${d.doc_date}|${Number(d.total).toFixed(2)}`;
+    const first = seen.get(key);
+    if (!first) {
+      seen.set(key, d);
+    } else {
+      if (!duplicates.includes(first)) duplicates.push(first);
+      duplicates.push(d);
+    }
+  }
+
   const attention = [
+    { key: "duplicates", rows: duplicates, label: t.possibleDuplicate, hint: t.possibleDuplicateHint },
     { key: "unbilled", rows: unbilled, label: t.unbilledWork, hint: t.unbilledWorkHint },
     { key: "overdue", rows: overdue, label: t.overdueBills, hint: t.overdueHint },
     { key: "awaiting", rows: awaiting, label: t.awaitingReply, hint: t.awaitingHint },
@@ -102,7 +123,14 @@ export default async function HomePage({
   // ---- the list underneath ----
   let docs: HomeDoc[];
   if (show) {
-    const sets: Record<string, HomeDoc[]> = { unpaid, unbilled, overdue, awaiting, drafts };
+    const sets: Record<string, HomeDoc[]> = {
+      unpaid,
+      unbilled,
+      overdue,
+      awaiting,
+      drafts,
+      duplicates,
+    };
     docs = sets[show] ?? [];
   } else if (q) {
     // Straight to the database, so a bill from three years ago is findable.
