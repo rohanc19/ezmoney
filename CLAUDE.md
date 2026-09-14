@@ -64,6 +64,7 @@ supabase/migrations/0004_v4.sql     shop price book (shops + item_prices)
 supabase/migrations/0005_v5.sql     part-payments (payments), client_id indexes
 supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anything looks wrong
 supabase/seed.sql                   demo data (attaches to first auth user)
+supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
 src/middleware.ts                   session refresh + login redirect
 src/lib/actions.ts                  every server action
 src/lib/gst.ts                      tax computation (single source of truth)
@@ -86,6 +87,12 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 
 ## Things that will bite you
 
+- **`UNITS` is ordered by what he actually writes, not alphabetically.** Two
+  years of his bills are almost all `Nos`, then metres of wire, then points,
+  then dozens and coils — so those sit at the top of a dropdown he scrolls on
+  a phone. `Hrs`, `Day`, `Job` and `Lump` never appeared once in 22 documents
+  and sit at the bottom. Never remove a unit: the string is stored on every
+  line item, and a value missing from the list renders as a blank select.
 - **The ₹ sign is missing from fonts on his old PC.** `public/fonts/rupee-*.woff2`
   are ~700-byte fonts containing only U+20B9, wired up in `globals.css` with
   `unicode-range`. Don't remove them, and don't assume a glyph exists on his machine.

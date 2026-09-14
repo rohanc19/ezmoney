@@ -7,7 +7,29 @@ export type DocStatus =
   | "partly_paid"
   | "paid";
 
-export const UNITS = ["Nos", "Mtr", "Ft", "Hrs", "Day", "Job", "Set", "Point", "Lump"] as const;
+// Ordered by how often he actually writes them. Counted across two years
+// of his own bills: "No" is most of every bill, then metres of wire, then
+// points, then dozens of bends and coils of cable. Hrs/Day/Job/Lump never
+// appeared once in 22 documents, so they sit at the bottom rather than in
+// the middle of the list he scrolls on a phone.
+export const UNITS = [
+  "Nos",
+  "Mtr",
+  "Point",
+  "Ft",
+  "Doz",
+  "Coil",
+  "Box",
+  "Kg",
+  "Role",
+  "Length",
+  "Bag",
+  "Set",
+  "Job",
+  "Day",
+  "Hrs",
+  "Lump",
+] as const;
 export const EXPENSE_CATEGORIES = [
   "Materials", "Tools", "Transport", "Labour", "Fuel", "Consumables", "Rent", "Misc",
 ] as const;
