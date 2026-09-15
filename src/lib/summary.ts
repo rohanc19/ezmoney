@@ -144,3 +144,32 @@ export function findDuplicateBills<T extends DupCandidate>(docs: T[]): T[] {
   }
   return out;
 }
+
+/** One line of a worker's book, as the labour total needs it. */
+export interface LabourLine {
+  worker_id: string;
+  kind: string;
+  amount: number;
+}
+
+/**
+ * What he still owes his men, all told.
+ *
+ * Per person, then only the positive balances: a man he has overpaid is
+ * not credit against a man he owes, and netting them would quietly
+ * understate what has to leave his pocket on Saturday.
+ *
+ * Home and the labour book both show this figure, so it lives here —
+ * two screens disagreeing about what he owes is worse than neither
+ * showing it.
+ */
+export function labourDue(entries: LabourLine[]): number {
+  const book = new Map<string, number>();
+  for (const e of entries) {
+    const owed = book.get(e.worker_id) ?? 0;
+    book.set(e.worker_id, owed + (e.kind === "work" ? Number(e.amount) : -Number(e.amount)));
+  }
+  let total = 0;
+  for (const balance of book.values()) total += Math.max(0, balance);
+  return Math.round(total * 100) / 100;
+}

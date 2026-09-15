@@ -1,6 +1,6 @@
 import Link from "next/link";
 import StatusPill from "@/components/StatusPill";
-import { findDuplicateBills } from "@/lib/summary";
+import { findDuplicateBills, labourDue } from "@/lib/summary";
 import { getDict } from "@/lib/i18n";
 import { daysBetween, formatDate, formatINR, formatMonth } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -59,10 +59,13 @@ export default async function HomePage({
     .order("created_at", { ascending: false })
     .limit(1000);
 
-  const { data: clientRows } = await supabase
-    .from("clients")
-    .select("id, name")
-    .order("name");
+  const [{ data: clientRows }, { data: labourRows }] = await Promise.all([
+    supabase.from("clients").select("id, name").order("name"),
+    // What has to leave his pocket on Saturday. Money out belongs beside
+    // money in on the screen he opens first.
+    supabase.from("worker_entries").select("worker_id, kind, amount"),
+  ]);
+  const owedToLabour = labourDue(labourRows ?? []);
 
   const all = (allRaw ?? []) as unknown as HomeDoc[];
   const invoices = all.filter((d) => d.type === "invoice");
@@ -224,6 +227,18 @@ export default async function HomePage({
         <p className="mt-4 rounded-2xl bg-green-100 p-3 text-center font-bold text-green-900">
           {t.saved}
         </p>
+      )}
+
+      {owedToLabour > 0 && !show && !q && (
+        <Link
+          href="/labour"
+          className="card mt-4 flex items-center justify-between gap-3 p-4 no-underline"
+        >
+          <span className="font-semibold text-stone-600">{t.toPayLabour}</span>
+          <span className="tnum shrink-0 text-xl font-extrabold text-amber-700">
+            {formatINR(owedToLabour, 0)}
+          </span>
+        </Link>
       )}
 
       {/* ---------- search + filter ---------- */}

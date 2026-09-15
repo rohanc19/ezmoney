@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDict } from "@/lib/i18n";
+import { labourDue } from "@/lib/summary";
 import { formatINR } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -41,7 +42,7 @@ export default async function LabourPage() {
     return a.name.localeCompare(b.name);
   });
 
-  const totalToPay = rows.reduce((s, w) => s + Math.max(0, balanceOf(w.id)), 0);
+  const totalToPay = labourDue(entries ?? []);
 
   return (
     <main>

@@ -360,6 +360,13 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   nothing — Gopinath showed "no payments recorded yet" against ₹20,000
   received, on both the Summary and his own page. Anywhere that renders
   that null has to ask whether any payment exists before calling it none.
+- **What he owes his men sits under the hero on Home.** Money out beside
+  money in, on the screen he opens first — his week ends with paying
+  Basava and Muttu on Saturday, and that used to be visible only if he
+  tapped Labour. `labourDue` in `src/lib/summary.ts` is the figure and
+  both screens read it: two places disagreeing about what he owes is
+  worse than neither showing it. It sums the *positive* balances only —
+  a man he has overpaid is not credit against a man he owes.
 - **Home is the client list.** He opens the app to see who owes him what,
   not to read a stream of bills — every bill is already on its client, and
   the list said the same thing four times over. Each row carries the
