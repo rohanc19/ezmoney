@@ -4,7 +4,7 @@ import { addDayExpense, deleteDayExpense } from "@/lib/actions";
 import { addDays, formatDate, formatINR, todayISO } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
-import { EXPENSE_CATEGORIES, PAID_VIA } from "@/lib/types";
+import { EXPENSE_CATEGORIES, PAID_VIA, UNITS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +28,15 @@ export default async function DayPage({
   const today = todayISO();
   const day = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.d ?? "") ? searchParams.d! : today;
 
-  const [{ data: spends }, { data: labour }, { data: billed }, { data: paid }, { data: clients }] =
-    await Promise.all([
+  const [
+    { data: spends },
+    { data: labour },
+    { data: billed },
+    { data: paid },
+    { data: clients },
+    { data: shops },
+    { data: seenItems },
+  ] = await Promise.all([
       supabase
         .from("expenses")
         .select("id, item, vendor, category, amount, paid_via, clients(name)")
@@ -49,6 +56,10 @@ export default async function DayPage({
         .select("id, amount, method, documents(serial_no, clients(name))")
         .eq("paid_on", day),
       supabase.from("clients").select("id, name").order("name"),
+      supabase.from("shops").select("id, name").order("name"),
+      // The names he has bought before, so a material he types tonight
+      // matches the one he typed last month and the two prices meet.
+      supabase.from("item_prices").select("item").order("seen_on", { ascending: false }).limit(300),
     ]);
 
   const spent = (spends ?? []).reduce((s, e) => s + Number(e.amount), 0);
@@ -58,6 +69,8 @@ export default async function DayPage({
     .reduce((s, d) => s + Number(d.total), 0);
   const received = (paid ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const outOfPocket = spent + toLabour;
+
+  const knownItems = [...new Set((seenItems ?? []).map((r) => r.item))].slice(0, 120);
 
   const isToday = day === today;
   const heading = isToday ? t.today : formatDate(day);
@@ -125,22 +138,47 @@ export default async function DayPage({
       {/* the one line he types — what he bought, and what it cost */}
       <form action={addDayExpense} className="card mt-4 space-y-3 p-4">
         <input type="hidden" name="date" value={day} />
+        <div>
+          <input
+            name="item"
+            placeholder={t.whatDidYouBuy}
+            required
+            className="field"
+            list="known-materials"
+            autoComplete="off"
+          />
+          <datalist id="known-materials">
+            {knownItems.map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+        </div>
+        {/* How many, and what the lot came to. The unit price follows from
+            those two, and that is what the price book is made of. */}
         <div className="flex gap-2">
-          <div className="min-w-0 flex-1">
+          <div className="w-20 shrink-0">
             <input
-              name="item"
-              placeholder={t.whatDidYouBuy}
-              required
-              className="field"
-              autoComplete="off"
+              name="qty"
+              inputMode="decimal"
+              placeholder={t.qty}
+              aria-label={t.qty}
+              className="field tnum px-2 text-center"
             />
           </div>
-          <div className="w-28 shrink-0">
+          <div className="w-24 shrink-0">
+            <select name="unit" className="field px-2" defaultValue="Nos" aria-label={t.unit}>
+              {UNITS.map((u) => (
+                <option key={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0 flex-1">
             <input
               name="amount"
               inputMode="decimal"
-              placeholder="₹"
+              placeholder={t.totalPaid}
               required
+              aria-label={t.totalPaid}
               className="field tnum"
             />
           </div>
@@ -154,7 +192,14 @@ export default async function DayPage({
             </select>
           </div>
           <div className="min-w-0 flex-1">
-            <input name="vendor" placeholder={t.vendor} className="field" autoComplete="off" />
+            <select name="shop_id" className="field px-2" defaultValue="">
+              <option value="">{t.whichShop}</option>
+              {(shops ?? []).map((sh) => (
+                <option key={sh.id} value={sh.id}>
+                  {sh.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="flex gap-2">

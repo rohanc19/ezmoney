@@ -75,6 +75,7 @@ supabase/migrations/0007_sections.sql line_items.section — parts of a job
 supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist_items)
 supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, terms block
 supabase/migrations/0010_job_costs.sql  by-client indexes for job costing
+supabase/migrations/0011_day_prices.sql  expense shop/qty/unit; prices from the day book
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
@@ -315,6 +316,21 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   recorded on `/day` instead, where he is already sitting with the
   receipts, and the client picker on that form is what ties it to a job.
   Do not put prices back on the list.
+- **The price book is a by-product of recording the day, never a chore.**
+  It used to be a screen he fed by hand — add a shop, open it, type a
+  price — and it held five prices across four shops in two years, which
+  can answer nothing. Every price now comes from `/day`: he picks the
+  shop, says how many, and the unit price is `amount / qty`. There is no
+  hand entry left and there should not be. `/prices` only reads. Do not
+  add a "record a price" form anywhere.
+- **A quantity is what turns a total into a price.** A day-book line with
+  no quantity is still a perfectly good expense; it simply buys nothing
+  for the price book and is skipped rather than guessed at.
+- **`shops` is a list of names, not a feature.** He buys from five shops
+  plus an "Other" for the small ones he will not name, and that list only
+  exists to fill the shop box on `/day`. It lives in Settings, not the
+  nav. `expenses.shop_id` is a real reference so a renamed shop stays
+  joined up; `vendor` is kept alongside it as the name at the time.
 - **Tagging a `/day` expense to a client is the only route material cost
   takes into the app.** Everything margin-related reads
   `expenses.client_id`, so an untagged shop bill is money that vanishes

@@ -61,8 +61,8 @@ export default async function ExpensesPage({
         <Link href="/checklists" className="card flex min-h-[56px] items-center p-4 font-extrabold">
           {t.checklists}
         </Link>
-        <Link href="/shops" className="card flex min-h-[56px] items-center p-4 font-extrabold">
-          {t.priceBook}
+        <Link href="/prices" className="card flex min-h-[56px] items-center p-4 font-extrabold">
+          {t.whatThingsCost}
         </Link>
       </div>
 

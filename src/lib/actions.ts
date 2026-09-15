@@ -576,21 +576,62 @@ export async function addDayExpense(formData: FormData) {
   const item = String(formData.get("item") ?? "").trim();
   const amount = Number(formData.get("amount")) || 0;
 
+  const qty = Math.max(0, Number(formData.get("qty")) || 0);
+  const unit = String(formData.get("unit") ?? "").trim();
+  const shop_id = String(formData.get("shop_id") ?? "") || null;
+
   // A blank line is him tapping Add with nothing typed. Say nothing,
   // change nothing, stay on the day.
   if (item && amount !== 0) {
+    let vendor = "";
+    if (shop_id) {
+      const { data: shop } = await supabase
+        .from("shops")
+        .select("name")
+        .eq("id", shop_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      vendor = shop?.name ?? "";
+    }
+
     const { error } = await supabase.from("expenses").insert({
       user_id: user.id,
       date,
       category: String(formData.get("category") ?? "Materials"),
       item,
-      vendor: String(formData.get("vendor") ?? "").trim(),
+      vendor,
+      shop_id,
+      qty,
+      unit,
       amount,
       paid_via: String(formData.get("paid_via") ?? "Cash"),
       client_id: String(formData.get("client_id") ?? "") || null,
       notes: "",
     });
     if (error) throw error;
+
+    // What one of them cost, at that shop, on that day. Recording the
+    // evening is the only way prices get into the book now — asking him
+    // to keep a separate price list by hand produced five prices in two
+    // years. A quantity is what makes a total into a price, so a line
+    // without one buys nothing for the book and is simply skipped.
+    if (shop_id && qty > 0) {
+      const rate = round2(amount / qty);
+      if (rate > 0) {
+        const { error: priceError } = await supabase.from("item_prices").insert({
+          user_id: user.id,
+          shop_id,
+          item,
+          item_key: itemKey(item),
+          unit: unit || "Nos",
+          rate,
+          seen_on: date,
+          source: "day",
+          notes: "",
+        });
+        if (priceError) throw priceError;
+      }
+    }
   }
   revalidatePath("/day");
   redirect(`/day?d=${date}`);
@@ -945,8 +986,8 @@ export async function saveShop(formData: FormData) {
       .eq("id", id)
       .eq("user_id", user.id);
     if (error) throw error;
-    revalidatePath(`/shops/${id}`);
-    redirect(`/shops/${id}?saved=1`);
+    revalidatePath("/shops");
+    redirect("/shops?saved=1");
   }
   const { data, error } = await supabase
     .from("shops")
@@ -955,7 +996,7 @@ export async function saveShop(formData: FormData) {
     .single();
   if (error) throw error;
   revalidatePath("/shops");
-  redirect(`/shops/${data.id}?saved=1`);
+  redirect("/shops?saved=1");
 }
 
 export async function deleteShop(formData: FormData) {
@@ -965,44 +1006,6 @@ export async function deleteShop(formData: FormData) {
   if (error) throw error;
   revalidatePath("/shops");
   redirect("/shops");
-}
-
-/** One price, seen today (or on a day he picks), at one shop. */
-export async function savePrice(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const shop_id = String(formData.get("shop_id") ?? "");
-  const item = String(formData.get("item") ?? "").trim();
-  const rate = Number(formData.get("rate")) || 0;
-  if (!shop_id || !item || rate <= 0) redirect(shop_id ? `/shops/${shop_id}` : "/shops");
-
-  const { error } = await supabase.from("item_prices").insert({
-    user_id: user.id,
-    shop_id,
-    item,
-    item_key: itemKey(item),
-    unit: String(formData.get("unit") ?? "Nos"),
-    rate,
-    seen_on: String(formData.get("seen_on") ?? "") || todayISO(),
-    source: "manual",
-    notes: String(formData.get("notes") ?? "").trim(),
-  });
-  if (error) throw error;
-  revalidatePath(`/shops/${shop_id}`);
-  redirect(`/shops/${shop_id}?saved=1`);
-}
-
-export async function deletePrice(formData: FormData) {
-  const { supabase, user } = await requireUser();
-  const id = String(formData.get("id") ?? "");
-  const shop_id = String(formData.get("shop_id") ?? "");
-  const { error } = await supabase
-    .from("item_prices")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-  if (error) throw error;
-  revalidatePath(`/shops/${shop_id}`);
-  redirect(`/shops/${shop_id}`);
 }
 
 /**
