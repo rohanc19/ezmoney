@@ -74,6 +74,7 @@ supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anyt
 supabase/migrations/0007_sections.sql line_items.section — parts of a job
 supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist_items)
 supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, terms block
+supabase/migrations/0010_job_costs.sql  shop-list prices, shop, and the expense a list makes
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
@@ -87,6 +88,7 @@ src/lib/payments.ts                 part-payment sums and the derived bill statu
 src/lib/share.ts                    the mailto: body for a bill
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
 src/lib/spelling.ts                 proposed spelling fixes for what gets printed
+src/lib/jobcost.ts                  what a job cost and what it left
 src/lib/summary.ts                  days-to-settle, job-size buckets, month series
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
@@ -297,6 +299,33 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   tapping the button again is the obvious thing to do on a phone that has
   not visibly responded yet, and both bills then counted towards what he
   was owed.
+- **The app must never claim a profit it cannot support.** It reported
+  revenue minus labour and called it profit — ₹27,860 for 2026, against
+  ₹0 of recorded materials on ₹85,615 invoiced, when roughly two thirds of
+  what he bills is material he buys first. The figure was perhaps three
+  times too flattering, on the screen he would use to decide his prices.
+  `canShowMargin` in `src/lib/jobcost.ts` gates every margin on materials
+  actually having been recorded; where they have not, both the Summary
+  and the client page say so instead of showing a number.
+- **A priced shop list is one expense, and the list owns it.** He already
+  writes the list and hands it to the shop; the prices come back on the
+  shop's bill. `checklist_items.rate` holds them, and
+  `syncChecklistExpense` keeps exactly one `expenses` row per list via
+  `checklists.expense_id` — so re-pricing corrects that row rather than
+  adding a second, and clearing the prices deletes it. Rows ticked
+  `by_client` never count: that tick is the entire point of the column.
+  This is the only route by which material cost enters the app, so
+  anything that changes list prices has to go through that function.
+- **Job margin costs labour at the work, not at the payment.**
+  `worker_entries` of kind `work` tagged to the client, not the
+  payments — a man paid late still worked, and a week's payment covers
+  several jobs. The year's *cash* figure on the Summary is the opposite
+  and reads payments. Two questions, both true, never mixed.
+- **`daysToSettle` is null until a bill is fully covered**, which is
+  correct, and twice made a part-payer read as someone who had paid
+  nothing — Gopinath showed "no payments recorded yet" against ₹20,000
+  received, on both the Summary and his own page. Anywhere that renders
+  that null has to ask whether any payment exists before calling it none.
 - **Home is the client list.** He opens the app to see who owes him what,
   not to read a stream of bills — every bill is already on its client, and
   the list said the same thing four times over. Each row carries the

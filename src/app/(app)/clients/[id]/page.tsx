@@ -5,6 +5,7 @@ import StatusPill from "@/components/StatusPill";
 import { deleteClient } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
 import { formatDate, formatINR } from "@/lib/format";
+import { canShowMargin, jobCost } from "@/lib/jobcost";
 import { averageDaysToPay, type SummaryPayment } from "@/lib/summary";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -26,7 +27,8 @@ export default async function ClientLedgerPage({
   const t = getDict();
   const supabase = supabaseServer();
 
-  const [{ data: client }, { data: docs }, { data: expenses }] = await Promise.all([
+  const [{ data: client }, { data: docs }, { data: expenses }, { data: labourRows }] =
+    await Promise.all([
     supabase.from("clients").select("*").eq("id", params.id).maybeSingle(),
     supabase
       .from("documents")
@@ -38,7 +40,15 @@ export default async function ClientLedgerPage({
       .select("id, date, item, amount")
       .eq("client_id", params.id)
       .order("date", { ascending: false }),
-  ]);
+    // Days worked on this customer's sites — the cost of the labour the
+    // job consumed, which is not the same as what he handed over that
+    // week. A man paid late still worked.
+    supabase
+      .from("worker_entries")
+      .select("amount")
+      .eq("client_id", params.id)
+      .eq("kind", "work"),
+    ]);
   if (!client) notFound();
 
   const invoices = (docs ?? []).filter((d) => d.type === "invoice");
@@ -67,6 +77,8 @@ export default async function ClientLedgerPage({
   const received = invoices.reduce((s, d) => s + Number(d.amount_received), 0);
   const outstanding = billed - received;
   const spent = (expenses ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  const labourCost = (labourRows ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  const cost = jobCost({ billed, materials: spent, labour: labourCost });
 
   const wa = client.phone
     ? `https://wa.me/${
@@ -126,9 +138,11 @@ export default async function ClientLedgerPage({
         <p className="mt-2 text-sm font-semibold text-stone-600">
           {invoices.length === 1 ? t.oneJob : t.jobsCount.replace("{n}", String(invoices.length))}
           {" · "}
-          {daysToPay === null
-            ? t.noPaymentsYetShort
-            : t.paysInDays.replace("{n}", String(daysToPay))}
+          {daysToPay !== null
+            ? t.paysInDays.replace("{n}", String(daysToPay))
+            : received > 0
+              ? t.stillSettling
+              : t.noPaymentsYetShort}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/clients/${client.id}/statement`} className="btn-secondary">
@@ -166,6 +180,53 @@ export default async function ClientLedgerPage({
           </p>
         </div>
       </div>
+
+      {/* ---- what the work left him ----
+           Only once materials have actually been priced. Billed minus
+           labour alone is the flattering number this exists to stop. */}
+      {billed > 0 && (
+        <div className="card mt-3 p-4">
+          {canShowMargin(cost) ? (
+            <>
+              <dl className="text-sm">
+                <div className="flex justify-between py-0.5">
+                  <dt className="text-stone-600">{t.billedLabel}</dt>
+                  <dd className="tnum font-semibold">{formatINR(cost.billed, 0)}</dd>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <dt className="text-stone-600">{t.materialsUsed}</dt>
+                  <dd className="tnum font-semibold text-amber-700">
+                    − {formatINR(cost.materials, 0)}
+                  </dd>
+                </div>
+                {cost.labour > 0 && (
+                  <div className="flex justify-between py-0.5">
+                    <dt className="text-stone-600">{t.labourUsed}</dt>
+                    <dd className="tnum font-semibold text-amber-700">
+                      − {formatINR(cost.labour, 0)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
+                <span className="font-bold">{t.jobMargin}</span>
+                <span
+                  className={`tnum text-xl font-extrabold ${
+                    (cost.margin ?? 0) < 0 ? "text-red-700" : "text-green-800"
+                  }`}
+                >
+                  {formatINR(cost.margin ?? 0, 0)}
+                  <span className="ml-1 text-sm font-bold text-stone-500">
+                    {Math.round((cost.marginRate ?? 0) * 100)}%
+                  </span>
+                </span>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-sm text-stone-500">{t.noCostsYet}</p>
+          )}
+        </div>
+      )}
 
       {/* every bill */}
       <h2 className="eyebrow mt-7">{t.jobsFor}</h2>

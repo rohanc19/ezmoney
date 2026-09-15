@@ -116,6 +116,13 @@ export default async function SummaryPage({
       billed: row.billed,
       count: row.count,
       days: averageDaysToPay(row.docs, payments),
+      // daysToSettle is null until a bill is fully covered, so a customer
+      // half way through paying looked exactly like one who had paid
+      // nothing. Gopinath had sent ₹20,000 and still read "no payments
+      // recorded yet".
+      paidSomething: payments.some(
+        (p) => row.docs.some((d) => d.id === p.document_id) && Number(p.amount) > 0
+      ),
     })),
     (r) => r.billed,
     6
@@ -190,16 +197,28 @@ export default async function SummaryPage({
                   <dd className={`tnum font-bold ${tone}`}>{value}</dd>
                 </div>
               ))}
-              <div className="flex items-baseline justify-between gap-3 border-t border-line pt-2">
-                <dt className="font-bold">{t.profit}</dt>
-                <dd
-                  className={`tnum text-xl font-extrabold ${
-                    profit < 0 ? "text-red-700" : "text-ink"
-                  }`}
-                >
-                  {formatINR(profit, 0)}
-                </dd>
-              </div>
+              {/* Profit is money in minus money out. With no material cost
+                  recorded, "money out" is labour alone and the figure is
+                  revenue wearing a hat — his read ₹27,860 against ₹0 of
+                  materials on ₹85,615 invoiced. Say nothing instead. */}
+              {materials > 0 ? (
+                <div className="flex items-baseline justify-between gap-3 border-t border-line pt-2">
+                  <dt className="font-bold">{t.profit}</dt>
+                  <dd
+                    className={`tnum text-xl font-extrabold ${
+                      profit < 0 ? "text-red-700" : "text-ink"
+                    }`}
+                  >
+                    {formatINR(profit, 0)}
+                  </dd>
+                </div>
+              ) : (
+                <div className="border-t border-line pt-2">
+                  <p className="text-sm leading-snug text-stone-500">
+                    {t.profitNeedsMaterials}
+                  </p>
+                </div>
+              )}
             </dl>
           </div>
 
@@ -249,9 +268,11 @@ export default async function SummaryPage({
                         <span className="block text-xs text-stone-500">
                           {c.count === 1 ? t.oneJob : t.jobsCount.replace("{n}", String(c.count))}
                           {" · "}
-                          {c.days === null
-                            ? t.noPaymentsYetShort
-                            : t.paysInDays.replace("{n}", String(c.days))}
+                          {c.days !== null
+                            ? t.paysInDays.replace("{n}", String(c.days))
+                            : c.paidSomething
+                              ? t.stillSettling
+                              : t.noPaymentsYetShort}
                         </span>
                       </span>
                       <span className="tnum shrink-0 font-extrabold">
