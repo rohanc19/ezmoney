@@ -79,7 +79,7 @@ export default async function ClientLedgerPage({
   return (
     <main>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/clients" className="btn-secondary px-3">
+        <Link href="/" className="btn-secondary px-3">
           ← {t.back}
         </Link>
         <h1 className="truncate text-2xl font-extrabold">{client.name}</h1>
@@ -131,6 +131,9 @@ export default async function ClientLedgerPage({
             : t.paysInDays.replace("{n}", String(daysToPay))}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
+          <Link href={`/clients/${client.id}/statement`} className="btn-secondary">
+            {t.statement}
+          </Link>
           <Link href={`/clients/${client.id}/edit`} className="btn-secondary">
             {t.edit}
           </Link>

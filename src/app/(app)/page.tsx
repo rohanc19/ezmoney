@@ -15,6 +15,7 @@ interface HomeDoc {
   type: "estimate" | "invoice";
   serial_no: string;
   doc_date: string;
+  client_id: string | null;
   site_job: string;
   status: string;
   total: number;
@@ -59,11 +60,16 @@ export default async function HomePage({
   const { data: allRaw } = await supabase
     .from("documents")
     .select(
-      "id, type, serial_no, doc_date, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)"
+      "id, type, serial_no, doc_date, client_id, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)"
     )
     .order("doc_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1000);
+
+  const { data: clientRows } = await supabase
+    .from("clients")
+    .select("id, name")
+    .order("name");
 
   const all = (allRaw ?? []) as unknown as HomeDoc[];
   const invoices = all.filter((d) => d.type === "invoice");
@@ -137,7 +143,7 @@ export default async function HomePage({
     const safe = q.replace(/[,()*\\%]/g, " ").trim();
     let query = supabase
       .from("documents")
-      .select("id, type, serial_no, doc_date, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)")
+      .select("id, type, serial_no, doc_date, client_id, site_job, status, total, amount_received, linked_estimate_id, created_at, clients(name)")
       .order("doc_date", { ascending: false })
       .limit(200);
     if (type) query = query.eq("type", type);
@@ -172,6 +178,66 @@ export default async function HomePage({
     { label: t.estimates, value: "estimate" },
     { label: t.invoices, value: "invoice" },
   ];
+
+  // ---- where each client stands ----
+  // This is what he opens the app to see: the names, and against each one
+  // whether he is waiting on paper, waiting on money, or square.
+  type ClientState = {
+    id: string;
+    name: string;
+    outstanding: number;
+    bills: number;
+    last: string;
+    status: string | null;
+  };
+  const byClient = new Map<string, { outstanding: number; bills: number; last: string; draft: boolean; part: boolean; invoices: number }>();
+  for (const d of all) {
+    if (!d.client_id) continue;
+    const c = byClient.get(d.client_id) ?? {
+      outstanding: 0,
+      bills: 0,
+      last: "",
+      draft: false,
+      part: false,
+      invoices: 0,
+    };
+    c.bills += 1;
+    if (d.doc_date > c.last) c.last = d.doc_date;
+    if (d.type === "invoice") {
+      c.invoices += 1;
+      const owed = balanceOf(d);
+      c.outstanding += owed;
+      if (owed > 0.005 && d.status === "draft") c.draft = true;
+      if (owed > 0.005 && Number(d.amount_received) > 0) c.part = true;
+    }
+    byClient.set(d.client_id, c);
+  }
+
+  const clientStates: ClientState[] = (clientRows ?? []).map((c) => {
+    const x = byClient.get(c.id);
+    let status: string | null = null;
+    if (x && x.invoices > 0) {
+      if (x.outstanding <= 0.005) status = "paid";
+      else if (x.part) status = "partly_paid";
+      // An unsent draft is money he cannot chase yet — that is the more
+      // useful thing to say than "unpaid".
+      else if (x.draft) status = "draft";
+      else status = "sent";
+    }
+    return {
+      id: c.id,
+      name: c.name,
+      outstanding: x?.outstanding ?? 0,
+      bills: x?.bills ?? 0,
+      last: x?.last ?? "",
+      status,
+    };
+  });
+  clientStates.sort((a, b) => {
+    if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding; // who owes, first
+    if (a.last !== b.last) return b.last.localeCompare(a.last);
+    return a.name.localeCompare(b.name);
+  });
 
   return (
     <main>
@@ -253,27 +319,88 @@ export default async function HomePage({
             {type && <input type="hidden" name="type" value={type} />}
           </form>
 
-          <div className="mt-3 flex gap-2">
-            {filters.map((f) => (
-              <Link
-                key={f.value}
-                href={
-                  f.value
-                    ? `/?type=${f.value}${q ? `&q=${encodeURIComponent(q)}` : ""}`
-                    : q
-                      ? `/?q=${encodeURIComponent(q)}`
-                      : "/"
-                }
-                className={`btn flex-1 text-sm ${
-                  type === f.value
-                    ? "bg-accent text-white"
-                    : "border-2 border-line bg-white text-stone-700"
-                }`}
-              >
-                {f.label}
-              </Link>
-            ))}
+          {q && (
+            <div className="mt-3 flex gap-2">
+              {filters.map((f) => (
+                <Link
+                  key={f.value}
+                  href={
+                    f.value
+                      ? `/?type=${f.value}&q=${encodeURIComponent(q)}`
+                      : `/?q=${encodeURIComponent(q)}`
+                  }
+                  className={`btn flex-1 text-sm ${
+                    type === f.value
+                      ? "bg-accent text-white"
+                      : "border-2 border-line bg-white text-stone-700"
+                  }`}
+                >
+                  {f.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ---------- his customers ----------
+           The list of bills that used to live here said the same thing
+           four times over — every client's bills are on the client. This
+           is the names, and where each one stands. */}
+      {!show && !q && (
+        <>
+          <div className="mt-7 flex items-center justify-between gap-3">
+            <h2 className="eyebrow">{t.clients}</h2>
+            <Link href="/clients/new" className="text-sm font-bold text-accent">
+              + {t.addNewClient.replace("+ ", "")}
+            </Link>
           </div>
+
+          {clientStates.length === 0 ? (
+            <div className="card mt-3 p-8 text-center">
+              <p className="text-lg text-stone-600">{t.noClientsYet}</p>
+              <Link href="/clients/new" className="btn-primary mt-5">
+                + {t.addNewClient.replace("+ ", "")}
+              </Link>
+            </div>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {clientStates.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/clients/${c.id}`} className="card block p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-extrabold">{c.name}</span>
+                        <span className="mt-0.5 block text-sm text-stone-500">
+                          {c.bills === 0
+                            ? t.noBillsYet
+                            : `${c.bills === 1 ? t.oneBillLabel : t.nBills.replace("{n}", String(c.bills))}${
+                                c.last ? ` · ${formatDate(c.last)}` : ""
+                              }`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        {c.outstanding > 0.005 && (
+                          <span className="tnum block font-extrabold text-amber-700">
+                            {formatINR(c.outstanding, 0)}
+                          </span>
+                        )}
+                        {c.status && (
+                          <span className="mt-1 block">
+                            <StatusPill
+                              status={c.status}
+                              label={t.statusLabels[c.status]}
+                              size="sm"
+                            />
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 
@@ -287,11 +414,11 @@ export default async function HomePage({
             {t.showAllBills}
           </Link>
         </div>
-      ) : (
+      ) : q ? (
         <h2 className="eyebrow mt-7">{t.recentBills}</h2>
-      )}
+      ) : null}
 
-      {docs.length === 0 ? (
+      {!show && !q ? null : docs.length === 0 ? (
         <div className="card mt-3 p-8 text-center">
           <p className="text-lg text-stone-600">{t.noDocsYet}</p>
           <Link href="/documents/new?type=estimate" className="btn-primary mt-5">

@@ -588,6 +588,18 @@ button.card:active {
   letter-spacing: 0.04em;
 }
 
+/* A statement table has five columns and no block fallback, so on a
+   phone it scrolls inside its own box rather than being cut off at the
+   edge of the sheet. On paper it fits, and must not be clipped. */
+.doc-scroll {
+  overflow-x: auto;
+}
+@media print {
+  .doc-scroll {
+    overflow: visible !important;
+  }
+}
+
 /* The grid is wider than a phone; on paper it always fits the page. */
 @media (min-width: 640px) {
   .doc-table-wrap {

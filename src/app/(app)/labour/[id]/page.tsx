@@ -124,6 +124,9 @@ export default async function WorkerBookPage({
           <Link href={`/labour/${worker.id}/edit`} className="btn-secondary">
             {t.edit}
           </Link>
+          <Link href={`/labour/${worker.id}/statement`} className="btn-secondary">
+            {t.statement}
+          </Link>
           {wa && (
             <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-secondary">
               {t.sendOnWhatsApp}

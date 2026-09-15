@@ -10,11 +10,18 @@ import { usePathname } from "next/navigation";
 // Icons are inline SVG, not emoji: his old Windows PC has gaps in its
 // emoji font and draws tofu boxes instead.
 
-export type NavIcon = "home" | "new" | "clients" | "labour" | "expenses" | "settings";
+export type NavIcon = "home" | "new" | "today" | "clients" | "labour" | "expenses" | "settings";
 
 const paths: Record<NavIcon, React.ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5M9.5 20v-6h5v6" />,
   new: <path d="M12 5v14M5 12h14" />,
+  today: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" />
+      <path d="M8.5 14h7" />
+    </>
+  ),
   clients: (
     <>
       <circle cx="9" cy="8" r="3.2" />

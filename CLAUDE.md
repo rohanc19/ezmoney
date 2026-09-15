@@ -92,8 +92,8 @@ src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
 src/lib/format.ts                   ₹, Indian grouping, dd-mmm-yyyy, amount in words
 src/lib/i18n.ts                     English + Kannada labels
-src/app/(app)/...                   home, documents, clients, labour, shops, expenses,
-                                    summary, settings, rate-card
+src/app/(app)/...                   home (the client list), day, documents, clients,
+                                    labour, shops, expenses, summary, settings, rate-card
 src/app/api/scan/route.ts           OCR endpoint
 src/app/api/export/route.ts         CSV backup
 public/brand/                       CE logo files
@@ -127,6 +127,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   served through short-lived signed URLs. Never make that bucket public.
 - **Every table carries `user_id` with an RLS policy.** Keep it that way even
   though there is one user — multi-user later should need no schema change.
+- **Server actions default their dates with `todayISO()`, not
+  `toISOString()`.** Nine actions used the latter — a bill, an expense, a
+  day of work, a payment, a shop price and a shop list all defaulted to
+  the UTC date, so anything entered after half past five in the evening
+  IST was filed under the previous day. `todayISO` reads the date in IST.
 - **Never build a yyyy-mm-dd with `toISOString()`.** It converts to UTC,
   and midnight in Bangalore is half past six the previous evening in UTC,
   so every calendar date silently moves back a day — which turned the
@@ -291,6 +296,33 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   tapping the button again is the obvious thing to do on a phone that has
   not visibly responded yet, and both bills then counted towards what he
   was owed.
+- **Home is the client list.** He opens the app to see who owes him what,
+  not to read a stream of bills — every bill is already on its client, and
+  the list said the same thing four times over. Each row carries the
+  amount outstanding and one status word, where an unsent draft beats
+  "unpaid" because money he has not billed for is not money he can chase.
+  The bill list still exists, but only as a drill-down (`?show=` from the
+  attention cards, or `?q=` from search). **The Clients tab was removed**
+  from the nav for the same reason — it was a second door to one room —
+  and `/clients/[id]` therefore goes back to `/`, not to `/clients`.
+- **`/day` is his evening.** He finishes on site, comes home and writes the
+  day onto a spreadsheet. The page is one date with everything the app
+  already knows filled in — labour paid, bills raised, money received —
+  and one line for what it cannot know, which is the shop runs. Adding a
+  line returns to the same day, so it is a list he works down rather than
+  a form he reopens. Labour and payments are shown but not editable there:
+  they belong to the labour book and the bill, and a second place to edit
+  them is a second place for them to disagree.
+- **A statement is derived, never stored.** `/labour/[id]/statement` and
+  `/clients/[id]/statement` are built from `worker_entries`, `documents`
+  and `payments` at read time, so they cannot drift from what the app
+  shows. Both print through `.doc` and share the summary over WhatsApp.
+  Estimates appear on a client statement but are never counted into the
+  balance — a quote is not money owed.
+- **`.doc-table` has no phone fallback on a statement**, unlike the bill,
+  so it sits in `.doc-scroll`: scrolls inside its own box on a screen,
+  `overflow: visible` in print. Without it the Paid column is cut off the
+  right edge of the sheet on a phone and the page does not scroll.
 - **Home answers one question: what am I owed, and what do I do now.**
   It carried a Received / Expenses / Profit strip, where Profit was
   received minus recorded spend — and he records no material expenses at

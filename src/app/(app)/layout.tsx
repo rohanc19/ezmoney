@@ -6,7 +6,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const items: { href: string; label: string; icon: NavIcon }[] = [
     { href: "/", label: t.home, icon: "home" },
     { href: "/new", label: t.newDoc, icon: "new" },
-    { href: "/clients", label: t.clients, icon: "clients" },
+    { href: "/day", label: t.today, icon: "today" },
     { href: "/labour", label: t.labour, icon: "labour" },
     { href: "/expenses", label: t.expenses, icon: "expenses" },
     { href: "/settings", label: t.settings, icon: "settings" },

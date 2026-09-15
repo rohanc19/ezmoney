@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { computeServiceCharge, computeTotals } from "@/lib/gst";
 import { derivePaymentState, round2, sumPayments } from "@/lib/payments";
+import { todayISO } from "@/lib/format";
 import { itemKey } from "@/lib/prices";
 import { suggest } from "@/lib/spelling";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -91,7 +92,7 @@ export async function saveDocument(formData: FormData) {
 
   const id = String(formData.get("id") ?? "");
   const type = formData.get("type") === "invoice" ? "invoice" : "estimate";
-  const doc_date = String(formData.get("doc_date") ?? "") || new Date().toISOString().slice(0, 10);
+  const doc_date = String(formData.get("doc_date") ?? "") || todayISO();
   // Optional: blank means the bill carries no due date and prints none.
   const due_date = String(formData.get("due_date") ?? "").trim() || null;
   const site_job = String(formData.get("site_job") ?? "").trim();
@@ -355,7 +356,7 @@ export async function convertToInvoice(formData: FormData) {
       user_id: user.id,
       type: "invoice",
       serial_no: serial as string,
-      doc_date: new Date().toISOString().slice(0, 10),
+      doc_date: todayISO(),
       client_id: est.client_id,
       site_job: est.site_job,
       status: "draft",
@@ -564,6 +565,53 @@ async function storeReceipt(userId: string, file: File | null): Promise<string |
   return path;
 }
 
+/**
+ * One line of the day book. His evening habit is a list, not a form per
+ * item — so this takes only what he would write down (what, how much)
+ * and sends him straight back to the same day to write the next one.
+ */
+export async function addDayExpense(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const date = String(formData.get("date") ?? "") || todayISO();
+  const item = String(formData.get("item") ?? "").trim();
+  const amount = Number(formData.get("amount")) || 0;
+
+  // A blank line is him tapping Add with nothing typed. Say nothing,
+  // change nothing, stay on the day.
+  if (item && amount !== 0) {
+    const { error } = await supabase.from("expenses").insert({
+      user_id: user.id,
+      date,
+      category: String(formData.get("category") ?? "Materials"),
+      item,
+      vendor: String(formData.get("vendor") ?? "").trim(),
+      amount,
+      paid_via: String(formData.get("paid_via") ?? "Cash"),
+      client_id: String(formData.get("client_id") ?? "") || null,
+      notes: "",
+    });
+    if (error) throw error;
+  }
+  revalidatePath("/day");
+  redirect(`/day?d=${date}`);
+}
+
+export async function deleteDayExpense(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const date = String(formData.get("date") ?? "") || todayISO();
+  if (id) {
+    const { error } = await supabase
+      .from("expenses")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+  }
+  revalidatePath("/day");
+  redirect(`/day?d=${date}`);
+}
+
 export async function saveExpense(formData: FormData) {
   const { supabase, user } = await requireUser();
   const id = String(formData.get("id") ?? "");
@@ -582,7 +630,7 @@ export async function saveExpense(formData: FormData) {
   }
 
   const row = {
-    date: String(formData.get("date") ?? "") || new Date().toISOString().slice(0, 10),
+    date: String(formData.get("date") ?? "") || todayISO(),
     category: String(formData.get("category") ?? "Materials"),
     item: String(formData.get("item") ?? "").trim(),
     vendor: String(formData.get("vendor") ?? "").trim(),
@@ -806,7 +854,7 @@ export async function saveWorkerEntry(formData: FormData) {
   const kindRaw = String(formData.get("kind") ?? "work");
   const kind = ["work", "payment", "advance"].includes(kindRaw) ? kindRaw : "work";
   const entry_date =
-    String(formData.get("entry_date") ?? "") || new Date().toISOString().slice(0, 10);
+    String(formData.get("entry_date") ?? "") || todayISO();
 
   let days = 0;
   let rate = 0;
@@ -934,7 +982,7 @@ export async function savePrice(formData: FormData) {
     item_key: itemKey(item),
     unit: String(formData.get("unit") ?? "Nos"),
     rate,
-    seen_on: String(formData.get("seen_on") ?? "") || new Date().toISOString().slice(0, 10),
+    seen_on: String(formData.get("seen_on") ?? "") || todayISO(),
     source: "manual",
     notes: String(formData.get("notes") ?? "").trim(),
   });
@@ -1018,7 +1066,7 @@ export async function savePricesFromScan(payload: {
       item_key: itemKey(i.item),
       unit: i.unit || "Nos",
       rate: Number(i.rate),
-      seen_on: payload.seenOn || new Date().toISOString().slice(0, 10),
+      seen_on: payload.seenOn || todayISO(),
       source: "scan",
     }));
   if (rows.length === 0) return { saved: 0, shopName };
@@ -1085,7 +1133,7 @@ export async function recordPayment(formData: FormData) {
   const { error } = await supabase.from("payments").insert({
     user_id: user.id,
     document_id,
-    paid_on: String(formData.get("paid_on") ?? "") || new Date().toISOString().slice(0, 10),
+    paid_on: String(formData.get("paid_on") ?? "") || todayISO(),
     amount: round2(amount),
     method: String(formData.get("method") ?? "Cash"),
     notes: String(formData.get("notes") ?? "").trim(),
@@ -1177,7 +1225,7 @@ export async function payWeek(formData: FormData) {
   const { error } = await supabase.from("worker_entries").insert({
     user_id: user.id,
     worker_id,
-    entry_date: paid_on || new Date().toISOString().slice(0, 10),
+    entry_date: paid_on || todayISO(),
     kind: "payment",
     amount: round2(amount),
     paid_via: "Cash",
@@ -1261,7 +1309,7 @@ export async function saveChecklist(formData: FormData) {
       name: String(formData.get("name") ?? "").trim() || "List",
       client_id: String(formData.get("client_id") ?? "") || null,
       site_job: String(formData.get("site_job") ?? "").trim(),
-      list_date: String(formData.get("list_date") ?? "") || new Date().toISOString().slice(0, 10),
+      list_date: String(formData.get("list_date") ?? "") || todayISO(),
       notes: String(formData.get("notes") ?? "").trim(),
     })
     .eq("id", id)
