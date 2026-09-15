@@ -296,10 +296,16 @@ export default async function HomePage({
             </div>
           ) : (
             <ul className="mt-3 space-y-2">
-              {clientStates.map((c) => (
+              {clientStates.map((c, i) => (
                 <li key={c.id}>
                   <Link href={`/clients/${c.id}`} className="card block p-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span
+                        aria-hidden
+                        className="tnum w-5 shrink-0 pt-0.5 text-right text-sm font-bold text-stone-400"
+                      >
+                        {i + 1}
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-extrabold">{c.name}</span>
                         <span className="mt-0.5 block text-sm text-stone-500">
