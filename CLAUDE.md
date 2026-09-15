@@ -74,7 +74,7 @@ supabase/migrations/0006_catchup.sql  idempotent repair + a check; run when anyt
 supabase/migrations/0007_sections.sql line_items.section — parts of a job
 supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist_items)
 supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, terms block
-supabase/migrations/0010_job_costs.sql  shop-list prices, shop, and the expense a list makes
+supabase/migrations/0010_job_costs.sql  by-client indexes for job costing
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
@@ -306,16 +306,19 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   times too flattering, on the screen he would use to decide his prices.
   `canShowMargin` in `src/lib/jobcost.ts` gates every margin on materials
   actually having been recorded; where they have not, both the Summary
-  and the client page say so instead of showing a number.
-- **A priced shop list is one expense, and the list owns it.** He already
-  writes the list and hands it to the shop; the prices come back on the
-  shop's bill. `checklist_items.rate` holds them, and
-  `syncChecklistExpense` keeps exactly one `expenses` row per list via
-  `checklists.expense_id` — so re-pricing corrects that row rather than
-  adding a second, and clearing the prices deletes it. Rows ticked
-  `by_client` never count: that tick is the entire point of the column.
-  This is the only route by which material cost enters the app, so
-  anything that changes list prices has to go through that function.
+  and the client page point him at `/day` instead of showing a number.
+- **The shop list is a checklist, written before the shop run.** It was
+  briefly given a price column per row so a priced list became the job's
+  material cost. That is the wrong end of his day: he writes the list to
+  know what to buy, and coming back afterwards to type what each line cost
+  is precisely the data entry that never happens. Material cost is
+  recorded on `/day` instead, where he is already sitting with the
+  receipts, and the client picker on that form is what ties it to a job.
+  Do not put prices back on the list.
+- **Tagging a `/day` expense to a client is the only route material cost
+  takes into the app.** Everything margin-related reads
+  `expenses.client_id`, so an untagged shop bill is money that vanishes
+  from job costing — worth protecting if that form ever changes.
 - **Job margin costs labour at the work, not at the payment.**
   `worker_entries` of kind `work` tagged to the client, not the
   payments — a man paid late still worked, and a week's payment covers

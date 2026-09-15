@@ -12,8 +12,6 @@ import { formatDate, todayISO } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
 import { UNITS, type ChecklistItem } from "@/lib/types";
-import { formatINR } from "@/lib/format";
-import { listCost } from "@/lib/jobcost";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +30,7 @@ export default async function ChecklistPage({
   const t = getDict();
   const supabase = supabaseServer();
 
-  const [{ data: list }, { data: itemsRaw }, { data: clients }, { data: shops }, { data: profile }] =
+  const [{ data: list }, { data: itemsRaw }, { data: clients }, { data: profile }] =
     await Promise.all([
       supabase
         .from("checklists")
@@ -45,7 +43,6 @@ export default async function ChecklistPage({
         .eq("checklist_id", params.id)
         .order("position"),
       supabase.from("clients").select("id, name").order("name"),
-      supabase.from("shops").select("id, name").order("name"),
       supabase.from("business_profile").select("business_name, phone, logo_url").maybeSingle(),
     ]);
   if (!list) notFound();
@@ -54,15 +51,6 @@ export default async function ChecklistPage({
   const wanted = items.filter((i) => Number(i.qty) > 0);
   const fromShop = wanted.filter((i) => !i.by_client);
   const client = (list.clients as { name: string } | null) ?? null;
-
-  // What the shop charged for the half of the list he is paying for.
-  const shopTotal = listCost(
-    items.map((i) => ({
-      qty: Number(i.qty),
-      rate: Number((i as ChecklistItem & { rate?: number }).rate ?? 0),
-      by_client: i.by_client,
-    }))
-  );
 
   return (
     <main>
@@ -124,31 +112,11 @@ export default async function ChecklistPage({
               />
             </div>
           </div>
-          <div className="flex gap-3">
-            <div className="min-w-0 flex-1">
-              <label className="label" htmlFor="site_job">
-                {t.siteJob}
-              </label>
-              <input id="site_job" name="site_job" defaultValue={list.site_job} className="field" />
-            </div>
-            <div className="w-36">
-              <label className="label" htmlFor="shop_id">
-                {t.shopName}
-              </label>
-              <select
-                id="shop_id"
-                name="shop_id"
-                defaultValue={(list as { shop_id?: string | null }).shop_id ?? ""}
-                className="field px-2"
-              >
-                <option value="">—</option>
-                {(shops ?? []).map((sh) => (
-                  <option key={sh.id} value={sh.id}>
-                    {sh.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="label" htmlFor="site_job">
+              {t.siteJob}
+            </label>
+            <input id="site_job" name="site_job" defaultValue={list.site_job} className="field" />
           </div>
 
           {/* ---- the items: a quantity each, and who buys it ---- */}
@@ -157,9 +125,8 @@ export default async function ChecklistPage({
               <thead>
                 <tr className="border-b border-line bg-paper text-left">
                   <th className="px-3 py-2 font-bold">{t.description}</th>
-                  <th className="w-[4.5rem] px-1 py-2 text-center font-bold">{t.quantity}</th>
-                  <th className="w-[5rem] px-1 py-2 text-center font-bold">{t.shopRate}</th>
-                  <th className="w-12 px-1 py-2 text-center font-bold">{t.clientBuysShort}</th>
+                  <th className="w-20 px-1 py-2 text-center font-bold">{t.quantity}</th>
+                  <th className="w-16 px-2 py-2 text-center font-bold">{t.clientBuysShort}</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,23 +146,7 @@ export default async function ChecklistPage({
                         className="field tnum min-h-[44px] px-2 text-center"
                       />
                     </td>
-                    <td className="px-1 py-2">
-                      {/* Filled in from the shop's bill when it comes back.
-                          Until then it is blank and costs nothing. */}
-                      <input
-                        name={`rate_${i.id}`}
-                        defaultValue={
-                          Number((i as ChecklistItem & { rate?: number }).rate ?? 0) > 0
-                            ? String((i as ChecklistItem & { rate?: number }).rate)
-                            : ""
-                        }
-                        inputMode="decimal"
-                        placeholder="₹"
-                        aria-label={`${t.shopRate} ${i.description}`}
-                        className="field tnum min-h-[44px] px-1 text-center"
-                      />
-                    </td>
-                    <td className="px-1 py-2 text-center">
+                    <td className="px-2 py-2 text-center">
                       <input
                         type="checkbox"
                         name={`client_${i.id}`}
@@ -217,17 +168,9 @@ export default async function ChecklistPage({
             <input id="notes" name="notes" defaultValue={list.notes} className="field" />
           </div>
 
-          {shopTotal > 0 && (
-            <div className="card flex items-center justify-between p-4">
-              <span className="font-semibold text-stone-600">{t.materialsCost}</span>
-              <span className="tnum text-xl font-extrabold">{formatINR(shopTotal, 0)}</span>
-            </div>
-          )}
-
           <button type="submit" className="btn-primary w-full text-xl">
             {t.save}
           </button>
-          <p className="text-center text-xs leading-snug text-stone-500">{t.pricesBecomeExpense}</p>
         </form>
 
         {/* ---- odds and ends the template never knew about ---- */}

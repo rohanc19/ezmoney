@@ -6,7 +6,6 @@ import { redirect } from "next/navigation";
 import { computeServiceCharge, computeTotals } from "@/lib/gst";
 import { derivePaymentState, round2, sumPayments } from "@/lib/payments";
 import { todayISO } from "@/lib/format";
-import { listCost } from "@/lib/jobcost";
 import { itemKey } from "@/lib/prices";
 import { suggest } from "@/lib/spelling";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -1311,132 +1310,33 @@ export async function saveChecklist(formData: FormData) {
       client_id: String(formData.get("client_id") ?? "") || null,
       site_job: String(formData.get("site_job") ?? "").trim(),
       list_date: String(formData.get("list_date") ?? "") || todayISO(),
-      shop_id: String(formData.get("shop_id") ?? "") || null,
       notes: String(formData.get("notes") ?? "").trim(),
     })
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw error;
 
-  // Every row comes back as qty_<id>, rate_<id>, and client_<id> when ticked.
-  const updates: { id: string; qty: number; rate: number; by_client: boolean }[] = [];
+  // Every row comes back as qty_<id> and, when ticked, client_<id>.
+  const updates: { id: string; qty: number; by_client: boolean }[] = [];
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("qty_")) continue;
     const itemId = key.slice(4);
     updates.push({
       id: itemId,
       qty: Math.max(0, Number(value) || 0),
-      rate: Math.max(0, Number(formData.get(`rate_${itemId}`)) || 0),
       by_client: formData.get(`client_${itemId}`) === "on",
     });
   }
   for (const u of updates) {
     await supabase
       .from("checklist_items")
-      .update({ qty: u.qty, rate: u.rate, by_client: u.by_client })
+      .update({ qty: u.qty, by_client: u.by_client })
       .eq("id", u.id)
       .eq("user_id", user.id);
   }
 
-  // Prices on the list are only worth typing if they land somewhere the
-  // rest of the app can see, so the list keeps its own expense row in step.
-  await syncChecklistExpense(supabase, user.id, id);
-
   revalidatePath(`/checklists/${id}`);
-  revalidatePath("/summary");
   redirect(`/checklists/${id}?saved=1`);
-}
-
-/**
- * One shop list, one expense. Priced rows become a single Materials
- * expense against the list's client, so job costing, the Summary and the
- * day book all see the same money without him entering it twice.
- *
- * The list remembers which expense it made (`expense_id`), so pricing a
- * list again corrects that row rather than adding another — and clearing
- * the prices removes it. Anything the client buys himself never counts:
- * that tick is what the column is for.
- */
-async function syncChecklistExpense(
-  supabase: ReturnType<typeof supabaseServer>,
-  userId: string,
-  listId: string
-) {
-  const [{ data: list }, { data: rows }] = await Promise.all([
-    supabase
-      .from("checklists")
-      .select("id, name, client_id, site_job, list_date, shop_id, expense_id, is_template")
-      .eq("id", listId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase.from("checklist_items").select("qty, rate, by_client").eq("checklist_id", listId),
-  ]);
-  // A template carries no quantities and buys nothing.
-  if (!list || list.is_template) return;
-
-  const total = listCost(
-    (rows ?? []).map((r) => ({
-      qty: Number(r.qty),
-      rate: Number(r.rate ?? 0),
-      by_client: Boolean(r.by_client),
-    }))
-  );
-
-  if (total <= 0) {
-    // Nothing priced any more — the expense it once made must not linger.
-    if (list.expense_id) {
-      await supabase.from("expenses").delete().eq("id", list.expense_id).eq("user_id", userId);
-      await supabase
-        .from("checklists")
-        .update({ expense_id: null })
-        .eq("id", listId)
-        .eq("user_id", userId);
-    }
-    return;
-  }
-
-  let vendor = "";
-  if (list.shop_id) {
-    const { data: shop } = await supabase
-      .from("shops")
-      .select("name")
-      .eq("id", list.shop_id)
-      .maybeSingle();
-    vendor = shop?.name ?? "";
-  }
-
-  const row = {
-    date: list.list_date || todayISO(),
-    category: "Materials",
-    item: list.site_job ? `${list.name} — ${list.site_job}` : list.name,
-    vendor,
-    amount: total,
-    client_id: list.client_id,
-    paid_via: "Cash",
-    notes: "",
-  };
-
-  if (list.expense_id) {
-    const { error } = await supabase
-      .from("expenses")
-      .update(row)
-      .eq("id", list.expense_id)
-      .eq("user_id", userId);
-    if (error) throw error;
-    return;
-  }
-
-  const { data: made, error } = await supabase
-    .from("expenses")
-    .insert({ user_id: userId, ...row })
-    .select("id")
-    .single();
-  if (error) throw error;
-  await supabase
-    .from("checklists")
-    .update({ expense_id: made.id })
-    .eq("id", listId)
-    .eq("user_id", userId);
 }
 
 /** A one-off item the template did not know about. */

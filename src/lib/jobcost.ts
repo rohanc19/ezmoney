@@ -56,21 +56,6 @@ export function jobCost(input: {
 }
 
 /**
- * What a priced shop list came to. Rows the client buys himself are his
- * cost, not the electrician's, so they never count — that tick is the
- * whole point of the column. Rows with no quantity were never bought.
- */
-export function listCost(
-  rows: { qty: number; rate: number; by_client: boolean }[]
-): number {
-  return round2(
-    rows
-      .filter((r) => !r.by_client && Number(r.qty) > 0)
-      .reduce((s, r) => s + Number(r.qty) * Number(r.rate), 0)
-  );
-}
-
-/**
  * Whether a margin is worth showing. With materials unrecorded, "profit"
  * is just revenue minus labour, which is the lie this file exists to
  * stop — so a job with no material cost against it reports nothing.
