@@ -104,3 +104,43 @@ export function topBy<T>(rows: T[], value: (r: T) => number, limit: number): T[]
     .sort((a, b) => value(b) - value(a))
     .slice(0, limit);
 }
+
+/** The minimum a bill needs for the duplicate check to judge it. */
+export interface DupCandidate {
+  id: string;
+  type: string;
+  client_id: string | null;
+  doc_date: string;
+  total: number;
+}
+
+/**
+ * Bills that look like the same bill entered twice, in the order they
+ * were given, each group's members adjacent.
+ *
+ * Two *invoices* agreeing on the customer, the day and the amount to the
+ * paisa is not a coincidence — he had ₹38,062 of one apartment job on the
+ * books as both INV-2026-013 and -014, and neither looked wrong on its
+ * own. Estimates are excluded on purpose: quoting the same job twice,
+ * once revised, is an ordinary week.
+ *
+ * A bill with no customer is matched only against other bills with no
+ * customer, never lumped in with everything else that lacks one.
+ */
+export function findDuplicateBills<T extends DupCandidate>(docs: T[]): T[] {
+  const out: T[] = [];
+  const seen = new Map<string, T>();
+  for (const d of docs) {
+    if (d.type !== "invoice") continue;
+    const who = d.client_id ?? `none:${d.id}`;
+    const key = `${who}|${d.doc_date}|${Number(d.total).toFixed(2)}`;
+    const first = seen.get(key);
+    if (!first) {
+      seen.set(key, d);
+    } else {
+      if (!out.includes(first)) out.push(first);
+      out.push(d);
+    }
+  }
+  return out;
+}

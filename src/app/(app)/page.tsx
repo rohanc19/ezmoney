@@ -1,5 +1,6 @@
 import Link from "next/link";
 import StatusPill from "@/components/StatusPill";
+import { findDuplicateBills } from "@/lib/summary";
 import { getDict } from "@/lib/i18n";
 import { daysBetween, formatDate, formatINR, formatMonth } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -38,7 +39,9 @@ export default async function HomePage({
   const q = (searchParams.q ?? "").trim();
   const type =
     searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
-  const show = searchParams.show === "unpaid" ? "unpaid" : "";
+  const show = ["unpaid", "duplicates"].includes(searchParams.show ?? "")
+    ? searchParams.show!
+    : "";
 
   // One pass over his bills feeds the money, the attention list and the
   // filtered views. Search is the exception — it runs in the database so
@@ -71,10 +74,16 @@ export default async function HomePage({
   const outstanding = unpaid.reduce((s, d) => s + balanceOf(d), 0);
   const oldestDays = unpaid.length > 0 ? daysBetween(unpaid[0].doc_date) : 0;
 
+  // ---- the same bill twice ----
+  // One line, not a card: he asked for the attention stack off Home and
+  // was right, so this earns its place by being almost nothing when there
+  // is something to say, and nothing at all when there is not.
+  const duplicates = findDuplicateBills(all);
+
   // ---- the list underneath ----
   let docs: HomeDoc[];
   if (show) {
-    docs = show === "unpaid" ? unpaid : [];
+    docs = show === "unpaid" ? unpaid : show === "duplicates" ? duplicates : [];
   } else if (q) {
     // Straight to the database, so a bill from three years ago is findable.
     const safe = q.replace(/[,()*\\%]/g, " ").trim();
@@ -255,6 +264,16 @@ export default async function HomePage({
         </>
       )}
 
+      {duplicates.length > 0 && !show && !q && (
+        <Link
+          href="/?show=duplicates"
+          className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 no-underline"
+        >
+          <span>{t.possibleDuplicate}</span>
+          <span className="shrink-0 underline">{t.openBoth} →</span>
+        </Link>
+      )}
+
       {/* ---------- his customers ----------
            The list of bills that used to live here said the same thing
            four times over — every client's bills are on the client. This
@@ -320,7 +339,7 @@ export default async function HomePage({
       {show ? (
         <div className="mt-6 flex items-center justify-between gap-3">
           <h2 className="eyebrow">
-            {t.toCollect}
+            {show === "duplicates" ? t.possibleDuplicate : t.toCollect}
           </h2>
           <Link href="/" className="text-sm font-bold text-accent">
             {t.showAllBills}
@@ -331,12 +350,16 @@ export default async function HomePage({
       ) : null}
 
       {!show && !q ? null : docs.length === 0 ? (
-        <div className="card mt-3 p-8 text-center">
-          <p className="text-lg text-stone-600">{t.noDocsYet}</p>
-          <Link href="/documents/new?type=estimate" className="btn-primary mt-5">
-            ＋ {t.newEstimate}
-          </Link>
-        </div>
+        show ? (
+          <p className="card mt-3 p-8 text-center text-stone-600">{t.nothingHere}</p>
+        ) : (
+          <div className="card mt-3 p-8 text-center">
+            <p className="text-lg text-stone-600">{t.noDocsYet}</p>
+            <Link href="/documents/new?type=estimate" className="btn-primary mt-5">
+              ＋ {t.newEstimate}
+            </Link>
+          </div>
+        )
       ) : (
         <div className="mt-3 space-y-5">
           {months.map((m) => (

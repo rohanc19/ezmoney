@@ -80,6 +80,7 @@ supabase/checklist_templates_seed.sql    his six section templates, from his not
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
 supabase/rate_card_junk_cleanup.sql  the four rows in his list that are not items
+supabase/merge_gopinath.sql         one customer, entered twice with a different capital R
 supabase/role_to_roll.sql           the unit "Role" -> "Roll" (run any time)
 src/middleware.ts                   session refresh + login redirect
 src/lib/actions.ts                  every server action
@@ -287,12 +288,17 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   sensitively.** So the spelling fix updates first and merges only when
   Postgres actually returns 23505 — a looser comparison of our own
   (`ilike`) would delete rows that were never going to clash.
-- **Home has no "Needs your attention" list.** It was removed at his own
-  request: he wants the clients and nothing above them. The duplicate-bill
-  warning lived in it and went too, so `convertToInvoice`'s guard below is
-  now the only thing standing between him and the same bill twice — which
-  is fine for new ones and blind to any already on the books. If it ever
-  comes back, it belongs as one line, not a stack of cards.
+- **Home has no "Needs your attention" list** — he asked for the stack of
+  cards off, and was right. The duplicate-bill warning is the one thing
+  that came back, as a single amber line above the clients that appears
+  only when there is something to say. `findDuplicateBills` in
+  `src/lib/summary.ts` is the rule and is tested; estimates are excluded
+  because quoting the same job twice is an ordinary week, and bills with
+  no customer are never matched against each other. Anything else that
+  wants space on Home has to earn it the same way.
+- **An empty drill-down is not an empty app.** `?show=` with nothing in it
+  used to print "No bills yet — tap New Estimate", which reads as a fault
+  when he has ten bills and simply no duplicates.
 - **One estimate, one invoice.** `convertToInvoice` checks for an invoice
   already linked to the estimate and goes to it rather than minting a
   second. He had ₹38,062 of one apartment job on the books twice —
