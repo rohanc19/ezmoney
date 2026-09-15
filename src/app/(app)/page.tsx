@@ -25,12 +25,6 @@ interface HomeDoc {
   clients?: { name: string } | null;
 }
 
-/** A bill unpaid this long has stopped being "recent". */
-const OVERDUE_DAYS = 30;
-/** An estimate this old with no answer probably needs a phone call. */
-const NO_REPLY_DAYS = 7;
-/** A draft this old was almost certainly forgotten, not deferred. */
-const UNSENT_DAYS = 3;
 
 const balanceOf = (d: HomeDoc) => Number(d.total) - Number(d.amount_received);
 
@@ -44,11 +38,7 @@ export default async function HomePage({
   const q = (searchParams.q ?? "").trim();
   const type =
     searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
-  const show = ["unpaid", "unbilled", "overdue", "awaiting", "drafts", "duplicates"].includes(
-    searchParams.show ?? ""
-  )
-    ? searchParams.show!
-    : "";
+  const show = searchParams.show === "unpaid" ? "unpaid" : "";
 
   // One pass over his bills feeds the money, the attention list and the
   // filtered views. Search is the exception — it runs in the database so
@@ -73,7 +63,6 @@ export default async function HomePage({
 
   const all = (allRaw ?? []) as unknown as HomeDoc[];
   const invoices = all.filter((d) => d.type === "invoice");
-  const estimates = all.filter((d) => d.type === "estimate");
 
   // ---- what he is owed, across every year ----
   const unpaid = invoices
@@ -82,62 +71,10 @@ export default async function HomePage({
   const outstanding = unpaid.reduce((s, d) => s + balanceOf(d), 0);
   const oldestDays = unpaid.length > 0 ? daysBetween(unpaid[0].doc_date) : 0;
 
-  // ---- things that need him ----
-  const billedEstimateIds = new Set(
-    invoices.map((d) => d.linked_estimate_id).filter(Boolean) as string[]
-  );
-  // Work he was told to go ahead with, finished, and never invoiced.
-  const unbilled = estimates.filter(
-    (d) => d.status === "approved" && !billedEstimateIds.has(d.id)
-  );
-  const overdue = unpaid.filter((d) => daysBetween(d.doc_date) > OVERDUE_DAYS);
-  const awaiting = estimates.filter(
-    (d) => d.status === "sent" && daysBetween(d.doc_date) > NO_REPLY_DAYS
-  );
-  const drafts = all.filter(
-    (d) => d.status === "draft" && daysBetween(d.created_at.slice(0, 10)) > UNSENT_DAYS
-  );
-
-  // The same bill twice. He had one apartment job on the books as both
-  // INV-2026-013 and -014 — same client, same day, same ₹38,062 — and
-  // both were counting towards what he was owed, silently, because the
-  // list shows them as two ordinary rows. Two invoices agreeing on the
-  // client, the day and the amount to the paisa is not a coincidence
-  // worth staying quiet about. Estimates are excluded: quoting the same
-  // job twice is normal.
-  const duplicates: HomeDoc[] = [];
-  const seen = new Map<string, HomeDoc>();
-  for (const d of invoices) {
-    const key = `${d.clients?.name ?? d.id}|${d.doc_date}|${Number(d.total).toFixed(2)}`;
-    const first = seen.get(key);
-    if (!first) {
-      seen.set(key, d);
-    } else {
-      if (!duplicates.includes(first)) duplicates.push(first);
-      duplicates.push(d);
-    }
-  }
-
-  const attention = [
-    { key: "duplicates", rows: duplicates, label: t.possibleDuplicate, hint: t.possibleDuplicateHint },
-    { key: "unbilled", rows: unbilled, label: t.unbilledWork, hint: t.unbilledWorkHint },
-    { key: "overdue", rows: overdue, label: t.overdueBills, hint: t.overdueHint },
-    { key: "awaiting", rows: awaiting, label: t.awaitingReply, hint: t.awaitingHint },
-    { key: "drafts", rows: drafts, label: t.unsentDrafts, hint: t.unsentHint },
-  ].filter((a) => a.rows.length > 0);
-
   // ---- the list underneath ----
   let docs: HomeDoc[];
   if (show) {
-    const sets: Record<string, HomeDoc[]> = {
-      unpaid,
-      unbilled,
-      overdue,
-      awaiting,
-      drafts,
-      duplicates,
-    };
-    docs = sets[show] ?? [];
+    docs = show === "unpaid" ? unpaid : [];
   } else if (q) {
     // Straight to the database, so a bill from three years ago is findable.
     const safe = q.replace(/[,()*\\%]/g, " ").trim();
@@ -280,31 +217,6 @@ export default async function HomePage({
         </p>
       )}
 
-      {/* ---------- what to do about it ---------- */}
-      {attention.length > 0 && !show && !q && (
-        <>
-          <h2 className="eyebrow mt-6">{t.needsAttention}</h2>
-          <ul className="mt-2 space-y-2">
-            {attention.map((a) => (
-              <li key={a.key}>
-                <Link
-                  href={`/?show=${a.key}`}
-                  className="card flex items-center justify-between gap-3 p-4"
-                >
-                  <span className="min-w-0">
-                    <span className="block font-extrabold">{a.label}</span>
-                    <span className="block text-sm text-stone-500">{a.hint}</span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-sm font-extrabold text-amber-900">
-                    {a.rows.length}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
       {/* ---------- search + filter ---------- */}
       {!show && (
         <>
@@ -408,7 +320,7 @@ export default async function HomePage({
       {show ? (
         <div className="mt-6 flex items-center justify-between gap-3">
           <h2 className="eyebrow">
-            {attention.find((a) => a.key === show)?.label ?? t.toCollect}
+            {t.toCollect}
           </h2>
           <Link href="/" className="text-sm font-bold text-accent">
             {t.showAllBills}

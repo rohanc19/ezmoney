@@ -284,11 +284,12 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   sensitively.** So the spelling fix updates first and merges only when
   Postgres actually returns 23505 — a looser comparison of our own
   (`ilike`) would delete rows that were never going to clash.
-- **Home warns when the same bill appears twice.** Two *invoices* sharing
-  a client, a date and an amount to the paisa are surfaced in "Needs your
-  attention". Estimates are excluded — quoting the same job twice is
-  normal. This is the safety net behind the guard below: the guard stops
-  new duplicates, the warning finds ones already on the books.
+- **Home has no "Needs your attention" list.** It was removed at his own
+  request: he wants the clients and nothing above them. The duplicate-bill
+  warning lived in it and went too, so `convertToInvoice`'s guard below is
+  now the only thing standing between him and the same bill twice — which
+  is fine for new ones and blind to any already on the books. If it ever
+  comes back, it belongs as one line, not a stack of cards.
 - **One estimate, one invoice.** `convertToInvoice` checks for an invoice
   already linked to the estimate and goes to it rather than minting a
   second. He had ₹38,062 of one apartment job on the books twice —
@@ -301,8 +302,10 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   the list said the same thing four times over. Each row carries the
   amount outstanding and one status word, where an unsent draft beats
   "unpaid" because money he has not billed for is not money he can chase.
-  The bill list still exists, but only as a drill-down (`?show=` from the
-  attention cards, or `?q=` from search). **The Clients tab was removed**
+  The bill list still exists, but only as a drill-down: `?show=unpaid`,
+  which the figure in the hero links to, and `?q=` from search. Any other
+  `?show=` value falls back to the client list rather than an empty page,
+  so an old bookmark degrades quietly. **The Clients tab was removed**
   from the nav for the same reason — it was a second door to one room —
   and `/clients/[id]` therefore goes back to `/`, not to `/clients`.
 - **`/day` is his evening.** He finishes on site, comes home and writes the
