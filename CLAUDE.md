@@ -19,7 +19,7 @@ option that is simpler for him, not the one that is more capable.
   fetching frameworks. Check the bundle line in `next build` output before shipping.
   Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
   and expense forms (the three client components — DocumentForm, ScanSheet,
-  RatePicker); the bill form is at 105 kB — the due date took it to 103,
+  RatePicker, DayItemPicker — /day is 97 kB); the bill form is at 105 kB — the due date took it to 103,
   the spelling dictionary to 105. That is the ceiling; anything past
   ~105 kB needs a reason. The lever if it ever has to come down is
   `PHRASES` in `src/lib/spelling.ts`, which only the rate-card cleanup
@@ -323,6 +323,15 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   shop, says how many, and the unit price is `amount / qty`. There is no
   hand entry left and there should not be. `/prices` only reads. Do not
   add a "record a price" form anywhere.
+- **The chips on `/day` are what make the price book trustworthy.** He
+  writes the same material three ways — his own list holds three spellings
+  of 2.5 sqmm copper wire — and every variant that misses splits the price
+  history, so the cheapest-shop answer gets worse the more he uses it.
+  Tapping a name fixes the spelling at source. Ranked by what he has
+  actually bought (counted on `item_key`, so the three spellings count
+  once), topped up from the section templates by how many sections call
+  for the thing — not by template order, which would just offer whatever
+  sits at the top of the first list. Six, because eight was four rows.
 - **A quantity is what turns a total into a price.** A day-book line with
   no quantity is still a perfectly good expense; it simply buys nothing
   for the price book and is skipped rather than guessed at.

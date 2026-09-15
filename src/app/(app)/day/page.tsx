@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ConfirmButton from "@/components/ConfirmButton";
+import DayItemPicker from "@/components/DayItemPicker";
 import { addDayExpense, deleteDayExpense } from "@/lib/actions";
 import { addDays, formatDate, formatINR, todayISO } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
@@ -36,6 +37,7 @@ export default async function DayPage({
     { data: clients },
     { data: shops },
     { data: seenItems },
+    { data: templateItems },
   ] = await Promise.all([
       supabase
         .from("expenses")
@@ -59,7 +61,19 @@ export default async function DayPage({
       supabase.from("shops").select("id, name").order("name"),
       // The names he has bought before, so a material he types tonight
       // matches the one he typed last month and the two prices meet.
-      supabase.from("item_prices").select("item").order("seen_on", { ascending: false }).limit(300),
+      supabase
+        .from("item_prices")
+        .select("item, item_key, unit")
+        .order("seen_on", { ascending: false })
+        .limit(300),
+      // His six section templates are the materials he buys on every job,
+      // spelled the way he wrote them on his own pad. They fill the chips
+      // until he has bought enough for his own history to do it.
+      supabase
+        .from("checklist_items")
+        .select("description, unit, position, checklists!inner(is_template)")
+        .eq("checklists.is_template", true)
+        .limit(400),
     ]);
 
   const spent = (spends ?? []).reduce((s, e) => s + Number(e.amount), 0);
@@ -70,7 +84,44 @@ export default async function DayPage({
   const received = (paid ?? []).reduce((s, p) => s + Number(p.amount), 0);
   const outOfPocket = spent + toLabour;
 
-  const knownItems = [...new Set((seenItems ?? []).map((r) => r.item))].slice(0, 120);
+  const bought = seenItems ?? [];
+  const knownItems = [...new Set(bought.map((r) => r.item))].slice(0, 120);
+
+  // The chips: what he buys most, his own history first. item_key rather
+  // than the raw name, so three spellings of one wire count once — and
+  // the label shown is the most recent way he wrote it.
+  const tally = new Map<string, { label: string; unit: string; n: number }>();
+  for (const r of bought) {
+    const row = tally.get(r.item_key) ?? { label: r.item, unit: r.unit || "Nos", n: 0 };
+    row.n += 1;
+    tally.set(r.item_key, row);
+  }
+  const suggestions: { label: string; unit: string }[] = [...tally.values()]
+    .sort((a, b) => b.n - a.n)
+    .map((r) => ({ label: r.label, unit: r.unit }));
+
+  // Topped up from the templates, so the row is useful on the first night
+  // rather than after a month of typing. Ranked by how many sections call
+  // for the thing — tape and collars turn up in most of them, and those
+  // are what he buys on every job. Taking them in template order would
+  // just offer whatever happens to sit at the top of the first list.
+  const across = new Map<string, { label: string; unit: string; n: number }>();
+  for (const r of templateItems ?? []) {
+    const label = (r.description ?? "").trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    const row = across.get(key) ?? { label, unit: r.unit || "Nos", n: 0 };
+    row.n += 1;
+    across.set(key, row);
+  }
+  const taken = new Set(suggestions.map((s2) => s2.label.toLowerCase()));
+  for (const r of [...across.values()].sort((a, b) => b.n - a.n)) {
+    if (suggestions.length >= 6) break;
+    if (taken.has(r.label.toLowerCase())) continue;
+    taken.add(r.label.toLowerCase());
+    suggestions.push({ label: r.label, unit: r.unit });
+  }
+  const chips = suggestions.slice(0, 6);
 
   const isToday = day === today;
   const heading = isToday ? t.today : formatDate(day);
@@ -138,51 +189,12 @@ export default async function DayPage({
       {/* the one line he types — what he bought, and what it cost */}
       <form action={addDayExpense} className="card mt-4 space-y-3 p-4">
         <input type="hidden" name="date" value={day} />
-        <div>
-          <input
-            name="item"
-            placeholder={t.whatDidYouBuy}
-            required
-            className="field"
-            list="known-materials"
-            autoComplete="off"
-          />
-          <datalist id="known-materials">
-            {knownItems.map((d) => (
-              <option key={d} value={d} />
-            ))}
-          </datalist>
-        </div>
-        {/* How many, and what the lot came to. The unit price follows from
-            those two, and that is what the price book is made of. */}
-        <div className="flex gap-2">
-          <div className="w-20 shrink-0">
-            <input
-              name="qty"
-              inputMode="decimal"
-              placeholder={t.qty}
-              aria-label={t.qty}
-              className="field tnum px-2 text-center"
-            />
-          </div>
-          <div className="w-24 shrink-0">
-            <select name="unit" className="field px-2" defaultValue="Nos" aria-label={t.unit}>
-              {UNITS.map((u) => (
-                <option key={u}>{u}</option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-0 flex-1">
-            <input
-              name="amount"
-              inputMode="decimal"
-              placeholder={t.totalPaid}
-              required
-              aria-label={t.totalPaid}
-              className="field tnum"
-            />
-          </div>
-        </div>
+        <datalist id="known-materials">
+          {knownItems.map((d) => (
+            <option key={d} value={d} />
+          ))}
+        </datalist>
+        <DayItemPicker suggestions={chips} units={UNITS} t={t} />
         <div className="flex gap-2">
           <div className="w-32 shrink-0">
             <select name="category" className="field px-2" defaultValue="Materials">
