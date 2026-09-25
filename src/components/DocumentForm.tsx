@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import MaterialsPicker from "@/components/MaterialsPicker";
 import RatePicker from "@/components/RatePicker";
 import ScanSheet from "@/components/ScanSheet";
 import { formatDate, formatINR } from "@/lib/format";
@@ -14,6 +15,7 @@ import {
   type PriceHint,
   type RateCardItem,
   type ScannedItem,
+  type UnbilledPurchase,
 } from "@/lib/types";
 
 interface ItemState {
@@ -42,10 +44,14 @@ interface Props {
     service_charge_label: string;
   };
   initialItems: ItemState[];
+  /** Purchases already billed on this document, when editing one. */
+  initialUsedExpenses?: string[];
   /** Distinguishes drafts of different shapes for the same doc type. */
   variant?: string;
   clients: { id: string; name: string }[];
   rateCard: RateCardItem[];
+  /** Shop runs recorded against a client that no bill has claimed yet. */
+  unbilled: UnbilledPurchase[];
   gstEnabled: boolean;
   gstRate: number;
   defaultHsn: string;
@@ -70,9 +76,11 @@ export default function DocumentForm({
   type,
   initial,
   initialItems,
+  initialUsedExpenses = [],
   variant,
   clients,
   rateCard,
+  unbilled,
   gstEnabled,
   gstRate,
   defaultHsn,
@@ -110,6 +118,7 @@ export default function DocumentForm({
     address: "",
     state: "29",
   });
+  const [usedExpenses, setUsedExpenses] = useState<string[]>(initialUsedExpenses);
   const [restored, setRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const loaded = useRef(false);
@@ -268,6 +277,7 @@ export default function DocumentForm({
       {id && <input type="hidden" name="id" value={id} />}
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="items_json" value={itemsJson} />
+      <input type="hidden" name="used_expense_ids" value={JSON.stringify(usedExpenses)} />
 
       {restored && (
         <p className="rounded-2xl bg-amber-50 p-3 text-center font-semibold text-amber-900">
@@ -419,6 +429,15 @@ export default function DocumentForm({
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <RatePicker items={rateCard} t={t} onPick={addFromRateCard} />
           <ScanSheet t={t} onAdd={addFromScan} />
+          <MaterialsPicker
+            purchases={unbilled}
+            clientId={clientId}
+            t={t}
+            onPick={(rows, ids) => {
+              appendRows(rows.map((r) => ({ ...r, hsn: defaultHsn, section: lastSection() })));
+              setUsedExpenses((prev) => [...new Set([...prev, ...ids])]);
+            }}
+          />
         </div>
 
         <datalist id="bill-parts">

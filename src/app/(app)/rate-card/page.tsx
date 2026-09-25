@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ConfirmButton from "@/components/ConfirmButton";
 import { deleteRateCardItem, fixRateCardSpelling, saveRateCardItem } from "@/lib/actions";
-import { suggest } from "@/lib/spelling";
+import { suggestForRateCard } from "@/lib/spelling-rate-card";
 import { formatINR } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -28,7 +28,7 @@ export default async function RateCardPage({
   // What looks misspelled. Proposed only — nothing changes until he taps.
   const all = items ?? [];
   const withFix = all
-    .map((i) => ({ item: i, fixed: suggest(i.description) }))
+    .map((i) => ({ item: i, fixed: suggestForRateCard(i.description) }))
     .filter((r): r is { item: (typeof all)[number]; fixed: string } => r.fixed !== null);
   const fixing = searchParams.fix === "1";
   const listed = fixing ? withFix.map((r) => r.item) : all;
@@ -131,7 +131,7 @@ export default async function RateCardPage({
           {listed.map((i) => (
             <li key={i.id} className="card p-4">
               {(() => {
-                const fixed = suggest(i.description);
+                const fixed = suggestForRateCard(i.description);
                 if (!fixed) return null;
                 return (
                   <form action={fixRateCardSpelling} className="mb-3">

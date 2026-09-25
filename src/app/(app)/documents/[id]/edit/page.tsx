@@ -18,7 +18,18 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
   ]);
   if (!doc) notFound();
 
-  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates } = formData;
+  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates, unbilled } =
+    formData;
+
+  // Editing a bill: the purchases it already claimed are not in `unbilled`
+  // any more, so they are fetched back and offered alongside — otherwise
+  // reopening a bill would quietly forget which shop runs it was built
+  // from, and saving would release them.
+  const { data: alreadyBilled } = await supabase
+    .from("expenses")
+    .select("id, date, item, qty, unit, amount, vendor, client_id, billed_document_id")
+    .eq("billed_document_id", params.id);
+  const purchases = [...(alreadyBilled ?? []), ...unbilled];
 
   return (
     <main>
@@ -57,6 +68,8 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         }))}
         clients={clients}
         rateCard={rateCard}
+        unbilled={purchases}
+        initialUsedExpenses={(alreadyBilled ?? []).map((e) => e.id)}
         gstEnabled={profile?.gst_enabled ?? false}
         gstRate={Number(profile?.gst_rate ?? 0.18)}
         defaultHsn={profile?.default_hsn_sac ?? ""}

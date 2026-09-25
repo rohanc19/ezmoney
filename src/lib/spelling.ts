@@ -121,17 +121,7 @@ const PHRASES: Record<string, string> = {
   "3/4 inch colar": '3/4" Collar',
   "2inch ss niles": '2" SS Niles',
   "2 inch ss niles": '2" SS Niles',
-  "ding dongcolling bell": "Ding Dong Calling Bell",
-  "roma20 a socket": "Roma 20 A Socket",
-  "9 w le dbulb": "9 W LED Bulb",
-  "glass bulkhead water proof fittin g": "Glass Bulkhead Water Proof Fitting",
-  "2 core 2.5sqmm copper wir e": "2 Core 2.5 Sqmm Copper Wire",
-  "p o p  screw": "POP Screw",
-  "p o p screw": "POP Screw",
-  "iron box sevicing": "Iron Box Servicing",
-  "record 25 leter geaser": "Racold 25 Litre Geyser",
 };
-
 /**
  * Acronyms he spells out letter by letter. Listed rather than detected:
  * a rule that joins any run of single letters turns "15 W L E D Bulb"
@@ -166,11 +156,15 @@ function tidySpacing(s: string): string {
  * Never mutates anything — the caller decides whether to offer it, and
  * the user decides whether to take it.
  */
-export function suggest(input: string): string | null {
+export function suggest(
+  input: string,
+  extraPhrases: Record<string, string> = {}
+): string | null {
   const original = input ?? "";
   if (!original.trim()) return null;
 
-  const phrase = PHRASES[tidySpacing(original).toLowerCase()];
+  const tidy = tidySpacing(original).toLowerCase();
+  const phrase = PHRASES[tidy] ?? extraPhrases[tidy];
   let out = phrase ?? original;
 
   if (!phrase) {

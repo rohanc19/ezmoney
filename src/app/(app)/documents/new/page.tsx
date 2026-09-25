@@ -15,7 +15,8 @@ export default async function NewDocumentPage({
 }) {
   const t = getDict();
   const type = searchParams.type === "invoice" ? "invoice" : "estimate";
-  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates, today } = await getFormData();
+  const { clients, profile, rateCard, recentDescriptions, priceHints, ownRates, unbilled, today } =
+    await getFormData();
 
   // Priced by points: the shape his 2017 and 2020 whole-house sheets took.
   // Every point rate is laid out with the count left blank, so the job is
@@ -79,6 +80,7 @@ export default async function NewDocumentPage({
         variant={byPoints ? "points" : undefined}
         clients={clients}
         rateCard={rateCard}
+        unbilled={unbilled}
         gstEnabled={profile?.gst_enabled ?? false}
         gstRate={Number(profile?.gst_rate ?? 0.18)}
         defaultHsn={profile?.default_hsn_sac ?? ""}

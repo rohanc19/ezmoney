@@ -76,6 +76,7 @@ supabase/migrations/0008_checklists.sql  shop checklists (checklists + checklist
 supabase/migrations/0009_invoice_format.sql  due date, client PAN, bank branch, terms block
 supabase/migrations/0010_job_costs.sql  by-client indexes for job costing
 supabase/migrations/0011_day_prices.sql  expense shop/qty/unit; prices from the day book
+supabase/migrations/0012_bill_materials.sql  expenses.billed_document_id
 supabase/checklist_templates_seed.sql    his six section templates, from his notepad
 supabase/seed.sql                   demo data (attaches to first auth user)
 supabase/rate_card_seed.sql         his real rates, lifted from 22 of his old Excel bills
@@ -388,6 +389,20 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   shop, says how many, and the unit price is `amount / qty`. There is no
   hand entry left and there should not be. `/prices` only reads. Do not
   add a "record a price" form anywhere.
+- **A bill can pull in what he bought for that client.** He records every
+  shop run against a client on `/day` and then used to read back through
+  it and type the lot again. `MaterialsPicker` offers the unbilled ones
+  with a markup on cost, and `expenses.billed_document_id` records which
+  bill claimed them so the next bill on a long job does not offer them
+  twice. `saveDocument` clears and re-sets that link from the submitted
+  list, so removing a line frees the purchase again; editing a bill
+  refetches its own claimed ones so reopening it does not release them.
+  **Unverified end to end** — 0012 had not been run when this was built.
+- **`PHRASES` split when the bill form hit 106 kB.** The five strings he
+  still types stay in `src/lib/spelling.ts`, which ships to the phone; the
+  one-off wrecks that only exist in his rate card moved to
+  `src/lib/spelling-rate-card.ts`, which only the server imports. That was
+  the lever this file always named, and it bought the kilobyte back.
 - **The day book needs the spelling help as much as the bill form does,
   and for longer.** A bill's typo is read once; a day-book typo splits the
   price history for good. Two weeks in he had `1 inch c clamp` at ₹5.00

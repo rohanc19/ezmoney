@@ -7,7 +7,7 @@ import { computeServiceCharge, computeTotals } from "@/lib/gst";
 import { derivePaymentState, round2, sumPayments } from "@/lib/payments";
 import { todayISO } from "@/lib/format";
 import { itemKey } from "@/lib/prices";
-import { suggest } from "@/lib/spelling";
+import { suggestForRateCard } from "@/lib/spelling-rate-card";
 import { supabaseServer } from "@/lib/supabase/server";
 import { STATES } from "@/lib/types";
 
@@ -221,6 +221,31 @@ export async function saveDocument(formData: FormData) {
       .eq("user_id", user.id);
     if (error) throw error;
     await supabase.from("line_items").delete().eq("document_id", id).eq("user_id", user.id);
+  }
+
+  // The shop runs that went onto this bill. Cleared and re-set from what
+  // the form sent, so a purchase he removed from the bill goes back to
+  // being offered — the mark must follow the bill, not the first save.
+  {
+    let used: string[] = [];
+    try {
+      const raw = JSON.parse(String(formData.get("used_expense_ids") ?? "[]"));
+      if (Array.isArray(raw)) used = raw.map(String).filter(Boolean);
+    } catch {
+      /* a malformed list simply bills nothing — never block the save */
+    }
+    await supabase
+      .from("expenses")
+      .update({ billed_document_id: null })
+      .eq("user_id", user.id)
+      .eq("billed_document_id", docId);
+    if (used.length > 0) {
+      await supabase
+        .from("expenses")
+        .update({ billed_document_id: docId })
+        .eq("user_id", user.id)
+        .in("id", used);
+    }
   }
 
   if (taxLines.length > 0) {
@@ -508,7 +533,7 @@ export async function fixRateCardSpelling(formData: FormData) {
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
-  const fixed = item ? suggest(item.description) : null;
+  const fixed = item ? suggestForRateCard(item.description) : null;
   if (!fixed) redirect("/rate-card?fix=1");
 
   const { error } = await supabase

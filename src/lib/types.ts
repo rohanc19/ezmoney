@@ -199,6 +199,20 @@ export interface Expense {
   receipt_path: string | null;
 }
 
+/** A shop run he recorded on /day that no bill has claimed yet. */
+export interface UnbilledPurchase {
+  id: string;
+  date: string;
+  item: string;
+  qty: number;
+  unit: string;
+  /** What he paid, all of it — the unit cost is amount / qty. */
+  amount: number;
+  vendor: string;
+  client_id: string | null;
+  billed_document_id: string | null;
+}
+
 export interface Checklist {
   id: string;
   name: string;

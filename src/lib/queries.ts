@@ -1,7 +1,12 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/format";
 import { isStale, itemKey, latestPerShop, type PriceRow } from "@/lib/prices";
-import type { BusinessProfile, PriceHint, RateCardItem } from "@/lib/types";
+import type {
+  BusinessProfile,
+  PriceHint,
+  RateCardItem,
+  UnbilledPurchase,
+} from "@/lib/types";
 
 /**
  * What he has paid for materials, folded down small enough to hand to the
@@ -108,6 +113,7 @@ export async function getFormData() {
     { data: profile },
     { data: rateCard },
     { data: recentItems },
+    { data: unbilled },
     priceHints,
     ownRates,
   ] = await Promise.all([
@@ -120,6 +126,17 @@ export async function getFormData() {
         .order("description")
         .limit(200),
       supabase.from("line_items").select("description").order("id", { ascending: false }).limit(100),
+      // What he bought for a client and has not billed yet. Loaded for
+      // every client at once because the bill picks its client in the
+      // browser, and a round trip per change of dropdown would be worse
+      // than a few hundred rows he already has on his phone.
+      supabase
+        .from("expenses")
+        .select("id, date, item, qty, unit, amount, vendor, client_id, billed_document_id")
+        .not("client_id", "is", null)
+        .is("billed_document_id", null)
+        .order("date", { ascending: false })
+        .limit(300),
       getPriceHints(),
       getOwnRates(),
     ]);
@@ -142,6 +159,7 @@ export async function getFormData() {
     recentDescriptions,
     priceHints,
     ownRates,
+    unbilled: (unbilled ?? []) as UnbilledPurchase[],
     today: todayISO(),
   };
 }
