@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Dict } from "@/lib/i18n";
+import { suggest } from "@/lib/spelling";
 
 // The materials he buys, as one tap each.
 //
@@ -66,6 +67,19 @@ export default function DayItemPicker({
           list="known-materials"
           autoComplete="off"
         />
+        {(() => {
+          const fixed = suggest(item);
+          if (!fixed) return null;
+          return (
+            <button
+              type="button"
+              onClick={() => setItem(fixed)}
+              className="mt-1.5 block min-h-[32px] text-left text-xs leading-snug text-accent"
+            >
+              {t.didYouMean} <span className="font-bold underline">{fixed}</span>
+            </button>
+          );
+        })()}
       </div>
 
       {/* How many, and what the lot came to. The unit price follows from

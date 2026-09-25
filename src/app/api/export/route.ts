@@ -21,6 +21,9 @@ const TABLES: Record<string, { table: string; order: string }> = {
   checklists: { table: "checklists", order: "created_at" },
   checklist_items: { table: "checklist_items", order: "checklist_id" },
   business_profile: { table: "business_profile", order: "user_id" },
+  // The serial counter. Without it a restore starts numbering from 1 and
+  // collides with bills he already has on paper.
+  doc_counters: { table: "doc_counters", order: "year_key" },
 };
 
 function toCsv(rows: Record<string, unknown>[]): string {

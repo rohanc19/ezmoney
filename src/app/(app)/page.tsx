@@ -359,7 +359,9 @@ export default async function HomePage({
                                   c.waiting >= CHASE_DAYS ? "font-bold text-amber-700" : ""
                                 }
                               >
-                                {t.waitingDays.replace("{n}", String(c.waiting))}
+                                {c.waiting === 1
+                                  ? t.waitingOneDay
+                                  : t.waitingDays.replace("{n}", String(c.waiting))}
                               </span>
                             </>
                           ) : c.last ? (

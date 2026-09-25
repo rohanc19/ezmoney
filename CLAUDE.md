@@ -19,7 +19,7 @@ option that is simpler for him, not the one that is more capable.
   fetching frameworks. Check the bundle line in `next build` output before shipping.
   Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
   and expense forms (the three client components — DocumentForm, ScanSheet,
-  RatePicker, DayItemPicker — /day is 97 kB); the bill form is at 105 kB — the due date took it to 103,
+  RatePicker, DayItemPicker — /day is 98.3 kB); the bill form is at 105 kB — the due date took it to 103,
   the spelling dictionary to 105. That is the ceiling; anything past
   ~105 kB needs a reason. The lever if it ever has to come down is
   `PHRASES` in `src/lib/spelling.ts`, which only the rate-card cleanup
@@ -349,6 +349,13 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   shop, says how many, and the unit price is `amount / qty`. There is no
   hand entry left and there should not be. `/prices` only reads. Do not
   add a "record a price" form anywhere.
+- **The day book needs the spelling help as much as the bill form does,
+  and for longer.** A bill's typo is read once; a day-book typo splits the
+  price history for good. Two weeks in he had `1 inch c clamp` at ₹5.00
+  and `1 inch CClamp` at ₹2.00 as separate items, so the 60% cheaper shop
+  was invisible. `suggest` runs on the item field there too now, and the
+  dictionary carries what his own evenings produced: combained, exast,
+  fam, motar, regulater, adopter, Hevels, DPMCB, TJoint, CClamp.
 - **The chips on `/day` are what make the price book trustworthy.** He
   writes the same material three ways — his own list holds three spellings
   of 2.5 sqmm copper wire — and every variant that misses splits the price
