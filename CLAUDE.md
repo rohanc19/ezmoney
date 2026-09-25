@@ -387,6 +387,16 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   both screens read it: two places disagreeing about what he owes is
   worse than neither showing it. It sums the *positive* balances only —
   a man he has overpaid is not credit against a man he owes.
+- **A client row says how long he has waited, not when he last billed.**
+  `Sent` alone made a twenty-day bill and a yesterday bill look identical
+  on the screen he opens first, while outstanding grew 57% in eleven days
+  against ₹9,253 collected. `oldestUnpaidDate` in `src/lib/summary.ts` is
+  the rule: the *oldest* unpaid invoice, because a second job for the same
+  customer would otherwise hide the first; drafts count, since an unsent
+  bill is still unpaid work and its age is the argument for sending it;
+  estimates never count, a quote is not money owed. Past `CHASE_DAYS` the
+  figure goes bold amber — the words are always there, so the colour only
+  adds. The last-bill date comes back once nothing is owed.
 - **Home is the client list.** He opens the app to see who owes him what,
   not to read a stream of bills — every bill is already on its client, and
   the list said the same thing four times over. Each row carries the

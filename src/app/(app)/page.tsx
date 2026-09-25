@@ -1,6 +1,6 @@
 import Link from "next/link";
 import StatusPill from "@/components/StatusPill";
-import { findDuplicateBills, labourDue } from "@/lib/summary";
+import { findDuplicateBills, labourDue, oldestUnpaidDate } from "@/lib/summary";
 import { getDict } from "@/lib/i18n";
 import { daysBetween, formatDate, formatINR, formatMonth } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -28,6 +28,9 @@ interface HomeDoc {
 
 
 const balanceOf = (d: HomeDoc) => Number(d.total) - Number(d.amount_received);
+
+/** Past this, the wait is worth pointing at rather than just stating. */
+const CHASE_DAYS = 14;
 
 export default async function HomePage({
   searchParams,
@@ -138,8 +141,21 @@ export default async function HomePage({
     bills: number;
     last: string;
     status: string | null;
+    /** Days since the oldest bill he is still owed on. 0 when none. */
+    waiting: number;
   };
-  const byClient = new Map<string, { outstanding: number; bills: number; last: string; draft: boolean; part: boolean; invoices: number }>();
+  const byClient = new Map<
+    string,
+    {
+      outstanding: number;
+      bills: number;
+      last: string;
+      draft: boolean;
+      part: boolean;
+      invoices: number;
+      docs: HomeDoc[];
+    }
+  >();
   for (const d of all) {
     if (!d.client_id) continue;
     const c = byClient.get(d.client_id) ?? {
@@ -149,7 +165,9 @@ export default async function HomePage({
       draft: false,
       part: false,
       invoices: 0,
+      docs: [],
     };
+    c.docs.push(d);
     c.bills += 1;
     if (d.doc_date > c.last) c.last = d.doc_date;
     if (d.type === "invoice") {
@@ -180,6 +198,10 @@ export default async function HomePage({
       bills: x?.bills ?? 0,
       last: x?.last ?? "",
       status,
+      waiting: (() => {
+        const from = x ? oldestUnpaidDate(x.docs) : null;
+        return from ? daysBetween(from) : 0;
+      })(),
     };
   });
   clientStates.sort((a, b) => {
@@ -326,9 +348,25 @@ export default async function HomePage({
                         <span className="mt-0.5 block text-sm text-stone-500">
                           {c.bills === 0
                             ? t.noBillsYet
-                            : `${c.bills === 1 ? t.oneBillLabel : t.nBills.replace("{n}", String(c.bills))}${
-                                c.last ? ` · ${formatDate(c.last)}` : ""
-                              }`}
+                            : c.bills === 1
+                              ? t.oneBillLabel
+                              : t.nBills.replace("{n}", String(c.bills))}
+                          {c.waiting > 0 ? (
+                            <>
+                              {" · "}
+                              <span
+                                className={
+                                  c.waiting >= CHASE_DAYS ? "font-bold text-amber-700" : ""
+                                }
+                              >
+                                {t.waitingDays.replace("{n}", String(c.waiting))}
+                              </span>
+                            </>
+                          ) : c.last ? (
+                            ` · ${formatDate(c.last)}`
+                          ) : (
+                            ""
+                          )}
                         </span>
                       </span>
                       <span className="shrink-0 text-right">

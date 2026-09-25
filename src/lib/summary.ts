@@ -173,3 +173,31 @@ export function labourDue(entries: LabourLine[]): number {
   for (const balance of book.values()) total += Math.max(0, balance);
   return Math.round(total * 100) / 100;
 }
+
+/** A bill, as the ageing needs it. */
+export interface AgeingBill {
+  type: string;
+  doc_date: string;
+  total: number;
+  amount_received: number;
+}
+
+/**
+ * The date of the oldest *invoice* he is still owed money on, or null.
+ *
+ * The oldest one is what decides whether a customer needs chasing: a
+ * client with a bill from three weeks ago and one from yesterday is a
+ * three-week problem, and taking the latest date would hide that every
+ * time he does a second job for them. Drafts count — an unsent bill is
+ * still work he has not been paid for, and the age is the argument for
+ * sending it.
+ */
+export function oldestUnpaidDate(bills: AgeingBill[]): string | null {
+  let oldest: string | null = null;
+  for (const b of bills) {
+    if (b.type !== "invoice") continue;
+    if (Number(b.total) - Number(b.amount_received) <= 0.005) continue;
+    if (oldest === null || b.doc_date < oldest) oldest = b.doc_date;
+  }
+  return oldest;
+}
