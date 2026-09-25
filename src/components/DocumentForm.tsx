@@ -42,6 +42,8 @@ interface Props {
     service_charge_label: string;
   };
   initialItems: ItemState[];
+  /** Distinguishes drafts of different shapes for the same doc type. */
+  variant?: string;
   clients: { id: string; name: string }[];
   rateCard: RateCardItem[];
   gstEnabled: boolean;
@@ -68,6 +70,7 @@ export default function DocumentForm({
   type,
   initial,
   initialItems,
+  variant,
   clients,
   rateCard,
   gstEnabled,
@@ -78,7 +81,7 @@ export default function DocumentForm({
   ownRates,
   t,
 }: Props) {
-  const draftKey = `ezmoney-draft-${id ?? "new-" + type}`;
+  const draftKey = `ezmoney-draft-${id ?? "new-" + type}${variant ? `-${variant}` : ""}`;
   const [items, setItems] = useState<ItemState[]>(
     initialItems.length > 0 ? initialItems : [emptyItem(defaultHsn)]
   );
@@ -129,7 +132,10 @@ export default function DocumentForm({
         if (d.scMode) setScMode(d.scMode);
         if (d.scValue) setScValue(d.scValue);
         if (d.scLabel) setScLabel(d.scLabel);
-        if (d.siteJob || (d.items ?? []).some((i: ItemState) => i.description)) setRestored(true);
+        const typed = (d.items ?? []).some(
+          (i: ItemState) => i.description && (Number(i.qty) || 0) > 0
+        );
+        if (d.siteJob || typed) setRestored(true);
       }
     } catch {
       /* draft is a convenience — ignore problems */
@@ -185,7 +191,10 @@ export default function DocumentForm({
 
   const itemsJson = JSON.stringify(
     items
-      .filter((i) => i.description.trim())
+      // A point sheet lays out every rate and he fills in a handful, so
+      // the rest must fall away rather than print as ₹0 lines. The shop
+      // list has always worked this way.
+      .filter((i) => i.description.trim() && (Number(i.qty) || 0) > 0)
       .map((i) => ({
         description: i.description.trim(),
         qty: Number(i.qty) || 0,

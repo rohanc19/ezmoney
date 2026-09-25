@@ -18,6 +18,10 @@ export default function NewChooserPage() {
           <span className="text-2xl font-extrabold">{t.newInvoice}</span>
           <p className="mt-1 text-stone-500">{t.invoiceHint}</p>
         </Link>
+        <Link href="/documents/new?type=estimate&points=1" className="card block p-6">
+          <span className="text-2xl font-extrabold">{t.byPoints}</span>
+          <p className="mt-1 text-stone-500">{t.byPointsHint}</p>
+        </Link>
       </div>
     </main>
   );
