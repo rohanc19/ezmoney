@@ -237,6 +237,19 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   2017 and 2020 sheets took. The rows are queried directly, not filtered
   out of `getFormData`'s `rateCard`, which stops at 200 of his items and
   would silently drop some of the points.
+- **The point sheet renders as a table, not as item cards.** Twenty-five
+  rows of identical shape read as a table — his own 2017 and 2020 sheets
+  were one — and the card-per-item layout is for a bill he composes line
+  by line. Four columns do not fit 375px once the figures are real (1,650
+  feet of circuit against a ₹14,000 board), so the line amount sits under
+  the name where the wide column already has room, and "+ Add item" is
+  hidden: a nameless row would have nowhere to type its name. Picking
+  from his items still adds a named row.
+- **`.field` beats a width or padding utility on the same element.** It
+  is `w-full` with its own padding, so `w-28` and `px-0.5` both lose to
+  it — that is what collapsed the day-book row and then clipped "1650" in
+  the point table. Size the *wrapper*, or use a real rule with the
+  specificity to win (`.field.field-tight`).
 - **A line with no quantity is not a line.** A point sheet arrives with
   25 rates on it and he fills in a handful; the rest must fall away
   rather than print as ₹0 rows on a customer's estimate. The shop list

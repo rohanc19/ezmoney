@@ -129,6 +129,12 @@ body {
   @apply text-stone-400;
 }
 
+/* Numeric boxes in a table column: .field's padding is built for a
+   full-width form field and eats the room four figures need. */
+.field.field-tight {
+  @apply px-1 text-center;
+}
+
 .label {
   @apply mb-1.5 block text-[0.95rem] font-semibold text-stone-600;
 }

@@ -433,6 +433,63 @@ export default function DocumentForm({
           ))}
         </datalist>
 
+        {variant === "points" ? (
+          <div className="card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-paper text-left">
+                  <th className="px-2 py-2 font-bold">{t.description}</th>
+                  <th className="w-[4.2rem] px-0.5 py-2 text-center font-bold">{t.qty}</th>
+                  <th className="w-[5rem] px-0.5 py-2 text-center font-bold">{t.rate}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, idx) => {
+                  const amount = (Number(item.qty) || 0) * (Number(item.rate) || 0);
+                  return (
+                    <tr key={idx} className="border-b border-line">
+                      <td className="px-2 py-2">
+                        <span className="block font-semibold leading-snug">
+                          {item.description}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          {item.unit}
+                          {amount > 0 && (
+                            <>
+                              {" · "}
+                              <span className="tnum font-bold text-ink">
+                                {formatINR(amount, 0)}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-0.5 py-2">
+                        <input
+                          value={item.qty}
+                          onChange={(e) => update(idx, { qty: e.target.value })}
+                          inputMode="decimal"
+                          placeholder="0"
+                          aria-label={`${t.qty} ${item.description}`}
+                          className="field field-tight tnum min-h-[44px]"
+                        />
+                      </td>
+                      <td className="px-0.5 py-2">
+                        <input
+                          value={item.rate}
+                          onChange={(e) => update(idx, { rate: e.target.value })}
+                          inputMode="decimal"
+                          aria-label={`${t.rate} ${item.description}`}
+                          className="field field-tight tnum min-h-[44px]"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
         <div className="space-y-3">
           {items.map((item, idx) => (
             <div key={idx} className="card p-3">
@@ -570,14 +627,17 @@ export default function DocumentForm({
             </div>
           ))}
         </div>
+        )}
 
-        <button
-          type="button"
-          onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn, lastSection())])}
-          className="btn-secondary mt-3 w-full"
-        >
-          + {t.addItem}
-        </button>
+        {variant !== "points" && (
+          <button
+            type="button"
+            onClick={() => setItems((prev) => [...prev, emptyItem(defaultHsn, lastSection())])}
+            className="btn-secondary mt-3 w-full"
+          >
+            + {t.addItem}
+          </button>
+        )}
 
         {/* The two things he needs occasionally, as links rather than
             blocks. A plain cash bill never has to look at either. */}
