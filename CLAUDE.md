@@ -97,6 +97,7 @@ src/lib/share.ts                    the mailto: body for a bill
 src/lib/prices.ts                   item_key normalising, cheapest-price picking
 src/lib/spelling.ts                 proposed spelling fixes for what gets printed
 src/lib/jobcost.ts                  what a job cost and what it left
+src/lib/points.ts                   the order he quotes a house in (his 2017 sheet)
 src/lib/summary.ts                  days-to-settle, job-size buckets, month series
 src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
@@ -237,6 +238,13 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   2017 and 2020 sheets took. The rows are queried directly, not filtered
   out of `getFormData`'s `rateCard`, which stops at 200 of his items and
   would silently drop some of the points.
+- **The point rates are ordered the way he walks a house**, not by price.
+  `POINT_ORDER` in `src/lib/points.ts` is his own 2-Apr-2017 sheet: light,
+  fan, two-way, plug, then the lighting circuit that serves them; heating;
+  the low-voltage points with their circuits after them; the boards; the
+  incoming cable; earthing last. Sorting by rate put "Light point"
+  fourteenth. A rate he adds later that is not named there falls to the
+  end rather than disappearing.
 - **The point sheet renders as a table, not as item cards.** Twenty-five
   rows of identical shape read as a table — his own 2017 and 2020 sheets
   were one — and the card-per-item layout is for a bill he composes line

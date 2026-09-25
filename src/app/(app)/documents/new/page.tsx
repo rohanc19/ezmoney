@@ -2,6 +2,7 @@ import Link from "next/link";
 import DocumentForm from "@/components/DocumentForm";
 import { saveDocument } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
+import { inPointOrder } from "@/lib/points";
 import { getFormData } from "@/lib/queries";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -36,9 +37,8 @@ export default async function NewDocumentPage({
     const { data: points } = await supabaseServer()
       .from("rate_card_items")
       .select("description, unit, rate, hsn_sac")
-      .eq("category", "Point")
-      .order("rate", { ascending: false });
-    pointRows = (points ?? []).map((r) => ({
+      .eq("category", "Point");
+    pointRows = inPointOrder(points ?? []).map((r) => ({
       description: r.description,
       qty: "",
       unit: r.unit,
