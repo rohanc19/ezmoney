@@ -26,17 +26,29 @@ export default async function WorkerDayPage({
   const date = params.date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
 
-  const [{ data: worker }, { data: rowsRaw }, { data: clients }] = await Promise.all([
-    supabase.from("workers").select("*").eq("id", params.id).maybeSingle(),
-    supabase
-      .from("worker_entries")
-      .select("*, clients(name)")
-      .eq("worker_id", params.id)
-      .eq("entry_date", date)
-      .order("created_at"),
-    supabase.from("clients").select("id, name").order("name"),
-  ]);
+  const [{ data: worker }, { data: rowsRaw }, { data: clients }, { data: dayBuys }] =
+    await Promise.all([
+      supabase.from("workers").select("*").eq("id", params.id).maybeSingle(),
+      supabase
+        .from("worker_entries")
+        .select("*, clients(name)")
+        .eq("worker_id", params.id)
+        .eq("entry_date", date)
+        .order("created_at"),
+      supabase.from("clients").select("id, name").order("name"),
+      // Who he bought materials for on this date. The strongest thing the
+      // app knows about where the day went, and it is already recorded.
+      supabase.from("expenses").select("client_id").eq("date", date).not("client_id", "is", null),
+    ]);
   if (!worker) notFound();
+
+  // Only when the day points at exactly one customer is it safe to fill in.
+  // His men work two and three sites in a day — "Dinesh/pravin/Latha house"
+  // is one of his own entries — and putting a whole day's wage on one of
+  // them would make a job margin confidently wrong, which is worse than
+  // leaving it short. Several, or none, and he picks.
+  const dayClientIds = Array.from(new Set((dayBuys ?? []).map((e) => e.client_id as string)));
+  const suggestedClient = dayClientIds.length === 1 ? dayClientIds[0] : "";
 
   const rows = (rowsRaw ?? []) as unknown as WorkerEntry[];
   const sum = (kind: string) =>
@@ -236,12 +248,32 @@ export default async function WorkerDayPage({
         )}
       </div>
 
-      {/* ---- the common case: he worked, here ---- */}
+      {/* ---- the common case: he worked, here ----
+           The customer sits on this form, not only on the folded-away one:
+           this button writes almost every work row there is, and without it
+           labour reached no job margin at all. */}
       <form action={markWorkedThisDay} className="mt-4 space-y-2">
         <input type="hidden" name="worker_id" value={worker.id} />
         <input type="hidden" name="day" value={date} />
         <input type="hidden" name="return_to" value={here} />
         <input name="site_job" placeholder={t.whereWorked} className="field" />
+        <select name="client_id" defaultValue={suggestedClient} className="field" aria-label={t.forClient}>
+          <option value="">{t.forClient} —</option>
+          {(clients ?? [])
+            .slice()
+            .sort((a, b) => {
+              // Whoever he bought for today, at the top of a list he scrolls
+              // on a phone — the rest stay in their usual order.
+              const aDay = dayClientIds.includes(a.id) ? 0 : 1;
+              const bDay = dayClientIds.includes(b.id) ? 0 : 1;
+              return aDay - bDay || a.name.localeCompare(b.name);
+            })
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+        </select>
         <button type="submit" className="btn-primary w-full">
           + {t.workedThisDay}
         </button>

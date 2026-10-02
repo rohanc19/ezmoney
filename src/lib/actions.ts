@@ -1232,6 +1232,12 @@ export async function markWorkedThisDay(formData: FormData) {
     rate,
     amount: rate,
     site_job: String(formData.get("site_job") ?? "").trim(),
+    // Job costing reads this and nothing else, and this form writes 18 of
+    // every 19 work rows — so leaving it off here is what kept labour out
+    // of every margin the app shows. Empty stays empty: a day split across
+    // three sites has no one client, and guessing one would put a whole
+    // day's wage on a job that saw a third of it.
+    client_id: String(formData.get("client_id") ?? "") || null,
   });
   if (error) throw error;
 

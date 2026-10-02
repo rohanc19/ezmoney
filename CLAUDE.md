@@ -460,6 +460,18 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   payments — a man paid late still worked, and a week's payment covers
   several jobs. The year's *cash* figure on the Summary is the opposite
   and reads payments. Two questions, both true, never mixed.
+- **A man's day is often split across two or three sites, and one
+  `client_id` cannot hold that.** His own entries read
+  "Dinesh/pravin/Latha house" and "Manthri/ shiva temple /Ravi p p
+  layout" — 7 of his first 19 work days name more than one site. That is
+  why `markWorkedThisDay` now carries the customer but never invents one:
+  it pre-selects only when exactly one customer had shop runs that date,
+  lists that date's customers at the top of the dropdown, and otherwise
+  leaves it empty. Putting a whole day's wage on one of three jobs would
+  make a margin confidently wrong, which is worse than one that is merely
+  short. **Splitting a day properly is unbuilt** — it needs either a
+  share per site or a row per site, and it is the ceiling on how accurate
+  job margins can get. Until then labour is a floor, not a figure.
 - **`daysToSettle` is null until a bill is fully covered**, which is
   correct, and twice made a part-payer read as someone who had paid
   nothing — Gopinath showed "no payments recorded yet" against ₹20,000
