@@ -378,6 +378,27 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   no bill shows the spend where the date would be, because that is the
   row he would tap. Two lines is the ceiling: a third is the attention
   stack coming back, which he has already rejected once.
+- **The client list shows who needs something, not everyone.** Fifteen of
+  his twenty-seven customers are square with him, and they sat between him
+  and the ten who owe money every time he opened the app — the same reason
+  the stream of bills came off this screen. A row is shown when money is
+  owed or when there are purchases against a customer with no bill;
+  everyone else is one line, `?all=1`. With nobody owing and nothing
+  unbilled the split would leave an empty list under a heading, which
+  reads as a fault rather than a good week, so then everyone is shown.
+- **The one button in the hero makes a bill, not a quote.** Since August
+  he has written 24 invoices against 7 estimates, and the single primary
+  action above the fold used to be the one he takes least. The chooser
+  with all three kinds is still a tap away on New.
+- **A status pill on a client row only earns its place when the figure
+  beside it cannot say the same thing.** "Sent" next to ₹8,727 and a wait
+  in days is three ways of saying one thing on a 48px row, and "Paid"
+  next to no figure at all is a fourth. Only `draft` (money he cannot
+  chase yet) and `partly_paid` (why the figure is smaller than the bill)
+  render. Worth knowing what that exposed: 8 of his 10 unpaid customers
+  are unsent drafts, so the pill is on nine rows in ten — the clutter it
+  removes today is small, and the thing it revealed is that most of what
+  he is owed has never been sent.
 - **An empty drill-down is not an empty app.** `?show=` with nothing in it
   used to print "No bills yet — tap New Estimate", which reads as a fault
   when he has ten bills and simply no duplicates.

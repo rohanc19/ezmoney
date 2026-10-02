@@ -35,7 +35,7 @@ const CHASE_DAYS = 14;
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: { q?: string; type?: string; show?: string; saved?: string };
+  searchParams: { q?: string; type?: string; show?: string; saved?: string; all?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
@@ -255,6 +255,23 @@ export default async function HomePage({
     return a.name.localeCompare(b.name);
   });
 
+  // ---- the ones that need something, and the rest ----
+  // Fifteen of his twenty-seven customers are square with him and want
+  // nothing, and they sat between him and the ten who owe money every
+  // time he opened the app. Same reason the stream of bills came off this
+  // screen: a row he never acts on is a row he scrolls past.
+  //
+  // `?all=1` shows everyone. With nobody owing and nothing unbilled the
+  // split would leave an empty list under a heading, which reads as a
+  // fault rather than a good week — so in that case everyone is shown.
+  const showAllClients = searchParams.all === "1";
+  const needsSomething = clientStates.filter(
+    (c) => c.outstanding > 0.005 || c.spentUnbilled > 0.005
+  );
+  const restCount = clientStates.length - needsSomething.length;
+  const visibleClients =
+    showAllClients || needsSomething.length === 0 ? clientStates : needsSomething;
+
   return (
     <main>
       {/* ---------- what he is owed ---------- */}
@@ -282,11 +299,15 @@ export default async function HomePage({
           <p className="mt-2 text-lg font-bold text-teal-100">{t.nothingOutstanding}</p>
         )}
 
+        {/* A bill, not a quote. Since August he has written 24 invoices
+            against 7 estimates — the one button above the fold was the
+            action he takes least often. The chooser is still a tap away
+            on New. */}
         <Link
-          href="/documents/new?type=estimate"
+          href="/documents/new?type=invoice"
           className="btn mt-5 w-full bg-white text-lg text-accent-deep shadow-sm"
         >
-          ＋ {t.newEstimate}
+          ＋ {t.newInvoice}
         </Link>
       </section>
 
@@ -392,7 +413,7 @@ export default async function HomePage({
             </div>
           ) : (
             <ul className="mt-3 space-y-2">
-              {clientStates.map((c, i) => (
+              {visibleClients.map((c, i) => (
                 <li key={c.id}>
                   <Link href={`/clients/${c.id}`} className="card block p-4">
                     <div className="flex items-start gap-3">
@@ -443,7 +464,14 @@ export default async function HomePage({
                             {formatINR(c.outstanding, 0)}
                           </span>
                         )}
-                        {c.status && (
+                        {/* Only where the pill says something the figure
+                            beside it cannot. "Sent" next to ₹8,727 and a
+                            wait in days is three ways of saying one thing
+                            on a 48px row; "Paid" next to no figure at all
+                            is a fourth. Draft is money he cannot chase
+                            yet, and Part paid explains why the figure is
+                            smaller than the bill — those two earn it. */}
+                        {(c.status === "draft" || c.status === "partly_paid") && (
                           <span className="mt-1 block">
                             <StatusPill
                               status={c.status}
@@ -458,6 +486,18 @@ export default async function HomePage({
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* The settled ones, one line instead of fifteen rows. */}
+          {restCount > 0 && !showAllClients && needsSomething.length > 0 && (
+            <Link href="/?all=1" className="mt-3 block text-center text-sm font-bold text-accent">
+              {t.seeAll} · {restCount} →
+            </Link>
+          )}
+          {showAllClients && (
+            <Link href="/" className="mt-3 block text-center text-sm font-bold text-accent">
+              ← {t.back}
+            </Link>
           )}
         </>
       )}
