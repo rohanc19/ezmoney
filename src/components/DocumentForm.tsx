@@ -5,6 +5,7 @@ import MaterialsPicker from "@/components/MaterialsPicker";
 import RatePicker from "@/components/RatePicker";
 import ScanSheet from "@/components/ScanSheet";
 import { formatDate, formatINR } from "@/lib/format";
+import { canShowMargin, jobCost } from "@/lib/jobcost";
 import type { Dict } from "@/lib/i18n";
 import { matchesQuery } from "@/lib/prices";
 import { suggest } from "@/lib/spelling";
@@ -182,6 +183,34 @@ export default function DocumentForm({
   const taxable = subtotal + serviceCharge;
   const gstAmount = gstEnabled ? taxable * gstRate : 0;
   const total = taxable + gstAmount;
+
+  // ---- what this bill is costing him ----
+  //
+  // Only the purchases he has actually ticked on from the materials
+  // picker. Those are unambiguous: he has said this bill covers them.
+  // Everything else he has bought for this customer is deliberately left
+  // out — a purchase made before 0012 carries no link to the bill that
+  // already claimed it, so counting those would charge an old job's
+  // material to a new bill and report a loss that is not there. Being
+  // short is survivable here; being wrong is not, and this number sits
+  // next to the one he is about to say out loud.
+  //
+  // Labour is 0 because at quote time nobody has worked yet. That makes
+  // this an upper bound on what is left, never a floor — which is the
+  // safe direction for a figure he prices against.
+  const claimedCost = useMemo(() => {
+    if (usedExpenses.length === 0) return 0;
+    const ids = new Set(usedExpenses);
+    return unbilled.reduce((s, p) => (ids.has(p.id) ? s + Number(p.amount) : s), 0);
+  }, [usedExpenses, unbilled]);
+
+  // The same arithmetic the client page and the Summary use, so three
+  // screens can never disagree about what a job left him.
+  const cost = useMemo(
+    () => jobCost({ billed: total, materials: claimedCost, labour: 0 }),
+    [total, claimedCost]
+  );
+  const showMargin = canShowMargin(cost);
 
   // What he has paid for this material before, shown under the description
   // as he types it. Matching is deliberately loose — the same wire is
@@ -833,9 +862,32 @@ export default function DocumentForm({
           is about to say out loud should never be a scroll away. */}
       {total > 0 && (
         <div className="total-bar no-print">
-          <div className="total-bar-inner flex items-center justify-between px-4 py-2.5">
-            <span className="font-semibold text-stone-600">{t.total}</span>
-            <span className="tnum text-xl font-extrabold">{formatINR(total)}</span>
+          <div className="total-bar-inner px-4 py-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-stone-600">{t.total}</span>
+              <span className="tnum text-xl font-extrabold">{formatINR(total)}</span>
+            </div>
+            {/* What the material he ticked on leaves him, while he can
+                still change the price. He found out afterwards until now:
+                one job came in at 26% and another at 93% and nothing on
+                this screen said so at the time. */}
+            {showMargin && cost.margin !== null && (
+              <div className="mt-1 flex items-center justify-between text-sm">
+                <span className="text-stone-500">
+                  {t.materialsUsed} {formatINR(cost.materials, 0)}
+                </span>
+                <span
+                  className={`tnum font-bold ${
+                    cost.margin < 0 ? "text-red-700" : "text-stone-600"
+                  }`}
+                >
+                  {t.jobMargin} {formatINR(cost.margin, 0)}
+                  {cost.marginRate !== null && (
+                    <span className="font-semibold"> ({Math.round(cost.marginRate * 100)}%)</span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

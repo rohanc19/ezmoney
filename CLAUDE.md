@@ -20,10 +20,18 @@ option that is simpler for him, not the one that is more capable.
   Measured Sep 2026: 87.3 kB shared, 96.2 kB on most screens, 102 kB on the bill
   and expense forms (the three client components — DocumentForm, ScanSheet,
   RatePicker, DayItemPicker — /day is 98.3 kB); the bill form is at 105 kB — the due date took it to 103,
-  the spelling dictionary to 105. That is the ceiling; anything past
-  ~105 kB needs a reason. The lever if it ever has to come down is
-  `PHRASES` in `src/lib/spelling.ts`, which only the rate-card cleanup
-  really needs and which could move to a server-only module.
+  the spelling dictionary to 105, and the live margin to **106 (Oct 2026)**.
+  That is the ceiling; anything past ~105 kB needs a reason, and the margin
+  is the reason on record: it is the only thing on the screen that tells him
+  what a bill leaves him while he can still change the price, against jobs
+  that have come in anywhere between 26% and 93%. Measured both ways — the
+  kilobyte is the JSX and the memos, not the `@/lib/jobcost` import, which
+  costs nothing and is kept so the form, the client page and the Summary
+  cannot disagree. The lever named here, moving `PHRASES` out of
+  `src/lib/spelling.ts`, **has already been pulled** (see
+  `spelling-rate-card.ts`); what is left of that file ships because `/day`
+  needs it too, so it is not a lever a second time. There is no cheap
+  kilobyte left: the next one has to come from a real decision.
 - **What actually costs him is paint, not bytes.** The machine renders in
   software more often than not. So: no `backdrop-filter` (it re-blurs the
   backdrop every scroll frame — it was on the nav and the total bar, and both
