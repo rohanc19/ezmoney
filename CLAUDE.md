@@ -131,10 +131,23 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **Line items are the source of truth.** Totals are recomputed from them
   (`computeTotals` in `src/lib/gst.ts`) and then persisted onto the document row.
   The print view recomputes too, so old rows can never print stale numbers.
-- **GST is live.** He is registered. Intrastate → CGST+SGST; interstate → IGST,
-  decided by comparing `business_profile.state_code` (Karnataka, 29) with the
-  document's `place_of_supply` (taken from the client's state). Clients with no
-  state set are treated as intrastate.
+- **GST is wired but switched OFF, and this line used to claim otherwise.**
+  Intrastate → CGST+SGST; interstate → IGST, decided by comparing
+  `business_profile.state_code` (Karnataka, 29) with the document's
+  `place_of_supply` (taken from the client's state). Clients with no state set
+  are treated as intrastate. **But as of Oct 2026 `gst_enabled` is false,
+  `gstin` is null, no client carries a GSTIN or a state, and not one of the
+  40 documents has ever carried a rupee of GST.** Whether he is actually
+  registered is unresolved — ask Rohan, do not assume either way from this
+  file, which asserted "he is registered" for months while the data said no.
+- **Do not flip `gst_enabled` on without reading this.** Every 2026 line item
+  already stores `gst_rate = 0.18` — 279 lines, ₹3,13,078 of value across 30
+  bills — because the form writes the rate whether or not the switch is on.
+  Totals are recomputed from line items, by the print view too, so turning the
+  switch on would make bills that have already been issued and settled print
+  roughly ₹56,000 of GST that was never charged or collected. 17 of them are
+  paid. Enabling GST is therefore not a settings change: it needs the existing
+  documents pinned to what the customer actually received first.
 - **Receipt photos are in a private bucket** (`receipts`), keyed `<user_id>/...`,
   served through short-lived signed URLs. Never make that bucket public.
 - **Every table carries `user_id` with an RLS policy.** Keep it that way even
