@@ -112,8 +112,10 @@ src/lib/scan/parse.ts               shop-bill text → line items
 src/lib/scan/providers.ts           OCR provider abstraction
 src/lib/format.ts                   ₹, Indian grouping, dd-mmm-yyyy, amount in words
 src/lib/i18n.ts                     English + Kannada labels
-src/app/(app)/...                   home (the client list), day, documents, clients,
-                                    labour, shops, expenses, summary, settings, rate-card
+src/app/(app)/...                   home (the client list), day, documents, clients/[id],
+                                    labour, shops, summary, month, settings, rate-card,
+                                    checklists, prices, expenses/[id]/edit
+                                    (no /clients and no /expenses index — see the nav note)
 src/app/api/scan/route.ts           OCR endpoint
 src/app/api/export/route.ts         CSV backup
 public/brand/                       CE logo files
@@ -526,6 +528,39 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   so an old bookmark degrades quietly. **The Clients tab was removed**
   from the nav for the same reason — it was a second door to one room —
   and `/clients/[id]` therefore goes back to `/`, not to `/clients`.
+  **`/clients` itself is gone too** (Oct 2026). Removing the tab left the
+  room standing: its only inbound link was the Back button on its own
+  `/clients/new` child, so the sole way in was to open "add a customer"
+  and press Back — into a second client list carrying none of the
+  outstanding or waiting-days that make Home worth opening.
+- **The nav is five, and five is the ceiling.** Home · New · Today ·
+  Labour · Settings — his day in order. It was seven, and the two that
+  went were the two that were not actions. **"Expenses" was a junk
+  drawer**: a second way to add a shop run, the only door to the shop
+  lists and the price book, a year total `/month` already gave, and a
+  flat list of every expense ever — under a word describing only the last
+  and least useful of the four. That flat list was the same thing the
+  worker ledger and the bill stream on Home were both deleted for; it was
+  simply the one nobody had got to yet. The two features worth keeping
+  moved to `/day`, where he is already buying, as one-line links.
+  **"Month" is read once a month**, which is not what a permanent tab is
+  for; it hangs off `/day` beside them, and `/month` still links on to
+  `/summary`. Seven also did not fit: at 360px, the commonest Android
+  width, a label gets 47.4px and "Expenses" measures 47.8px in Manrope
+  bold, so it truncated — measured, not estimated. Six or fewer fits
+  every phone down to 320px. A sixth tab therefore needs to be an action
+  he takes most days, not a screen he reads.
+- **There is no second way to record an expense, deliberately.**
+  `/expenses/new` and its `ExpenseForm` insert path are gone. The form
+  has no `qty`, no `unit` and no `shop_id` — only a free-text `vendor` —
+  so anything created through it was invisible to the price book and
+  unjoined to `shops`, which is precisely what the `/day` form exists to
+  prevent. All 99 of his expenses came through `/day`; the trap had never
+  been sprung. `/expenses/[id]/edit` **stays**, reached by tapping a line
+  on `/day`, because deleting and retyping a mistyped amount is not a
+  correction — and it is safe, since `saveExpense` names no `qty`, `unit`
+  or `shop_id` in its payload and an update only writes the columns it
+  names.
 - **`/day` is his evening.** He finishes on site, comes home and writes the
   day onto a spreadsheet. The page is one date with everything the app
   already knows filled in — labour paid, bills raised, money received —

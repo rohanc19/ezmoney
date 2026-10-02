@@ -248,7 +248,10 @@ export default async function DayPage({
         <ul className="mt-4 space-y-2">
           {(spends ?? []).map((e) => (
             <li key={e.id} className="card flex items-center gap-3 p-3">
-              <span className="min-w-0 flex-1">
+              {/* Tapping the line opens it. The flat expense list used to
+                  be the only way back to a line he had mistyped; deleting
+                  and retyping it is not a correction. */}
+              <Link href={`/expenses/${e.id}/edit?from=${day}`} className="min-w-0 flex-1 no-underline">
                 <span className="block truncate font-bold">{e.item}</span>
                 <span className="block text-xs text-stone-500">
                   {e.category}
@@ -258,7 +261,7 @@ export default async function DayPage({
                     ? ` · ${(e.clients as unknown as { name: string }).name}`
                     : ""}
                 </span>
-              </span>
+              </Link>
               <span className="tnum shrink-0 font-extrabold">{formatINR(Number(e.amount), 0)}</span>
               <form action={deleteDayExpense} className="shrink-0">
                 <input type="hidden" name="id" value={e.id} />
@@ -329,9 +332,23 @@ export default async function DayPage({
         </ul>
       )}
 
-      <Link href="/expenses" className="mt-5 block text-center text-sm font-bold text-accent">
-        {t.allExpenses} →
-      </Link>
+      {/* The three things that used to sit behind the word "Expenses".
+          Two of them he actually uses — he writes a shop list before the
+          run, and the price book answers which shop was cheaper — and
+          both were reachable only through a tab that read like a ledger.
+          They belong here, on the screen where he is already buying.
+          One line each, because he needs them occasionally, not daily. */}
+      <div className="mt-6 space-y-2 border-t border-line pt-4 text-center text-sm font-bold text-accent">
+        <Link href="/checklists" className="block">
+          {t.checklists} →
+        </Link>
+        <Link href="/prices" className="block">
+          {t.whatThingsCost} →
+        </Link>
+        <Link href={`/month?m=${day.slice(0, 7)}`} className="block">
+          {t.month} →
+        </Link>
+      </div>
     </main>
   );
 }

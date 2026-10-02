@@ -706,8 +706,16 @@ export async function saveExpense(formData: FormData) {
     notes: String(formData.get("notes") ?? "").trim(),
     receipt_path,
   };
-  if (!row.item) redirect("/expenses");
+  // Back to the day the line belongs to. This used to return to a flat
+  // list of every expense ever, which is the screen that no longer exists.
+  const back = `/day?d=${row.date}`;
+  if (!row.item) redirect(back);
 
+  // `row` deliberately carries no qty, unit or shop_id, and an update only
+  // writes the columns it names — so editing a line here leaves the three
+  // fields the price book is built on exactly as /day recorded them.
+  // Creating one here would have left them null, which is why there is no
+  // longer a path that does.
   if (id) {
     const { error } = await supabase
       .from("expenses")
@@ -719,8 +727,9 @@ export async function saveExpense(formData: FormData) {
     const { error } = await supabase.from("expenses").insert({ user_id: user.id, ...row });
     if (error) throw error;
   }
-  revalidatePath("/expenses");
-  redirect("/expenses?saved=1");
+  revalidatePath(back);
+  revalidatePath("/day");
+  redirect(`${back}&saved=1`);
 }
 
 export async function deleteExpense(formData: FormData) {
@@ -730,8 +739,10 @@ export async function deleteExpense(formData: FormData) {
   if (path) await supabase.storage.from("receipts").remove([path]);
   const { error } = await supabase.from("expenses").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw error;
-  revalidatePath("/expenses");
-  redirect("/expenses");
+  const back = String(formData.get("from") ?? "");
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(back) ? `/day?d=${back}` : "/day";
+  revalidatePath("/day");
+  redirect(to);
 }
 
 // ---------- clients ----------

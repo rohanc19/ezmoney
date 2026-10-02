@@ -51,7 +51,7 @@ export default async function PricesPage({
   return (
     <main>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/expenses" className="btn-secondary px-3">
+        <Link href="/day" className="btn-secondary px-3">
           ← {t.back}
         </Link>
         <h1 className="text-2xl font-extrabold">{t.whatThingsCost}</h1>

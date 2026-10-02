@@ -16,7 +16,7 @@ export default async function NewClientPage() {
   return (
     <main>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/clients" className="btn-secondary px-3">
+        <Link href="/" className="btn-secondary px-3">
           ← {t.back}
         </Link>
         <h1 className="text-2xl font-extrabold">{t.clientName}</h1>
