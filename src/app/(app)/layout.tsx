@@ -7,6 +7,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/", label: t.home, icon: "home" },
     { href: "/new", label: t.newDoc, icon: "new" },
     { href: "/day", label: t.today, icon: "today" },
+    { href: "/month", label: t.month, icon: "month" },
     { href: "/labour", label: t.labour, icon: "labour" },
     { href: "/expenses", label: t.expenses, icon: "expenses" },
     { href: "/settings", label: t.settings, icon: "settings" },

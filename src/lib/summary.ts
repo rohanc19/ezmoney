@@ -201,3 +201,83 @@ export function oldestUnpaidDate(bills: AgeingBill[]): string | null {
   }
   return oldest;
 }
+
+/** One month's money, on a cash basis. */
+export interface MonthMoney {
+  /** Invoices dated in the month. What he asked for. */
+  billed: number;
+  /** Payments that arrived in the month, against any bill. */
+  received: number;
+  /** Shop runs dated in the month. */
+  materials: number;
+  /** Money handed to his men in the month — payments and advances. */
+  labour: number;
+  spent: number;
+  /** received - spent. Null until materials have been recorded. */
+  left: number | null;
+  /** Invoices raised in the month. */
+  jobs: number;
+}
+
+const inMonth = (iso: string, key: string) => (iso ?? "").slice(0, 7) === key;
+
+/**
+ * What a month did, counted the way his bank account does: money that
+ * arrived minus money that left, both dated to when they moved.
+ *
+ * Billed is deliberately not part of that sum. A bill raised on the 28th
+ * and paid in November is this month's work and next month's cash, and
+ * mixing the two is how the app used to report a profit three times too
+ * flattering. `left` stays null until some material cost exists, because
+ * received minus labour alone is that same flattering number wearing a
+ * different hat.
+ */
+export function monthMoney(input: {
+  monthKey: string;
+  docs: { type: string; doc_date: string; total: number }[];
+  payments: { paid_on: string; amount: number }[];
+  expenses: { date: string; amount: number }[];
+  labour: { entry_date: string; kind: string; amount: number }[];
+}): MonthMoney {
+  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const { monthKey: k } = input;
+
+  const invoices = input.docs.filter((d) => d.type === "invoice" && inMonth(d.doc_date, k));
+  const billed = r2(invoices.reduce((s, d) => s + Number(d.total), 0));
+  const received = r2(
+    input.payments.filter((p) => inMonth(p.paid_on, k)).reduce((s, p) => s + Number(p.amount), 0)
+  );
+  const materials = r2(
+    input.expenses.filter((e) => inMonth(e.date, k)).reduce((s, e) => s + Number(e.amount), 0)
+  );
+  const labour = r2(
+    input.labour
+      .filter((e) => e.kind !== "work" && inMonth(e.entry_date, k))
+      .reduce((s, e) => s + Number(e.amount), 0)
+  );
+  const spent = r2(materials + labour);
+
+  return {
+    billed,
+    received,
+    materials,
+    labour,
+    spent,
+    left: materials > 0 ? r2(received - spent) : null,
+    jobs: invoices.length,
+  };
+}
+
+/** The month before this one, as yyyy-mm. */
+export function prevMonth(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** The month after. */
+export function nextMonth(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
