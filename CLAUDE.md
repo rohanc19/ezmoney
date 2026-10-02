@@ -341,6 +341,19 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   because quoting the same job twice is an ordinary week, and bills with
   no customer are never matched against each other. Anything else that
   wants space on Home has to earn it the same way.
+- **Money he never asked for is bigger than money he is chasing.** In
+  early October outstanding was ₹49,110 — against ₹57,890 of approved
+  estimate that had never been turned into a bill, and ₹11,153 of
+  material bought for a customer with no bill at all, not even a draft.
+  Nothing in the app said either, because an estimate is not money owed
+  and a shop run is not a document. `approvedNotBilled` in
+  `src/lib/summary.ts` is the first rule and is tested; it earns its
+  place the same way the duplicate warning does, as a second amber line
+  that is absent when there is nothing to say. The second lives on the
+  client row rather than in a third line — a customer with purchases and
+  no bill shows the spend where the date would be, because that is the
+  row he would tap. Two lines is the ceiling: a third is the attention
+  stack coming back, which he has already rejected once.
 - **An empty drill-down is not an empty app.** `?show=` with nothing in it
   used to print "No bills yet — tap New Estimate", which reads as a fault
   when he has ten bills and simply no duplicates.
@@ -359,6 +372,13 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   `canShowMargin` in `src/lib/jobcost.ts` gates every margin on materials
   actually having been recorded; where they have not, both the Summary
   and the client page point him at `/day` instead of showing a number.
+  **That gate is now open.** As of Oct 2026 he has recorded ₹59,988 of
+  materials across 99 shop runs, 93 of them tagged to a customer — the
+  habit took. Material is running at about half of revenue (₹56,916
+  against ₹1,13,486 received in September), so the margins the app can
+  now show are worth trusting and worth showing. What is still missing is
+  labour: 1 of 19 `work` rows carries a `client_id`, so every job margin
+  is flattering by whatever his men cost on it.
 - **His old Excel sheets use two pricing models, and they do not
   compare.** Whole-house wiring is priced per *point* — a light point at
   ₹550 in 2017 and 2020 meant wire, pipe, box, switch, plate and labour
@@ -397,7 +417,11 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   twice. `saveDocument` clears and re-sets that link from the submitted
   list, so removing a line frees the purchase again; editing a bill
   refetches its own claimed ones so reopening it does not release them.
-  **Unverified end to end** — 0012 had not been run when this was built.
+  0012 was run on 2-Oct-2026, so the picker is live. **Purchases made
+  before that date carry no link**, which is why Home flags "bought, not
+  billed" only for a customer with no bill at all: on a customer already
+  billed and paid, an old untagged purchase would read as unbilled work
+  when it is nothing of the sort. Eight customers are in that state.
 - **`PHRASES` split when the bill form hit 106 kB.** The five strings he
   still types stay in `src/lib/spelling.ts`, which ships to the phone; the
   one-off wrecks that only exist in his rate card moved to

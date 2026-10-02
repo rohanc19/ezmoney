@@ -145,6 +145,44 @@ export function findDuplicateBills<T extends DupCandidate>(docs: T[]): T[] {
   return out;
 }
 
+/** The minimum an estimate needs for the unbilled-work check to judge it. */
+export interface ApprovalCandidate {
+  id: string;
+  type: string;
+  status: string;
+  total: number;
+  linked_estimate_id: string | null;
+}
+
+/**
+ * Estimates he marked approved that no invoice has ever been raised against.
+ *
+ * The job is agreed and usually done; the bill is simply the step that got
+ * missed, and nothing in the app said so. He had ₹57,890 of geysers, fans
+ * and bulbs for one customer sitting approved and unbilled for 24 days —
+ * more than half of everything he collected that month — while Home showed
+ * him nothing at all, because an estimate is not money owed and so never
+ * reached the outstanding figure.
+ *
+ * An estimate of ₹0 is not money either: a sheet he opened and abandoned
+ * must not read as work waiting to be billed. `convertToInvoice` writes
+ * `linked_estimate_id`, so that link is what "billed" means here — the
+ * same one bill per estimate it already enforces.
+ */
+export function approvedNotBilled<T extends ApprovalCandidate>(docs: T[]): T[] {
+  const billedFrom = new Set<string>();
+  for (const d of docs) {
+    if (d.type === "invoice" && d.linked_estimate_id) billedFrom.add(d.linked_estimate_id);
+  }
+  return docs.filter(
+    (d) =>
+      d.type === "estimate" &&
+      d.status === "approved" &&
+      Number(d.total) > 0 &&
+      !billedFrom.has(d.id)
+  );
+}
+
 /** One line of a worker's book, as the labour total needs it. */
 export interface LabourLine {
   worker_id: string;

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import StatusPill from "@/components/StatusPill";
-import { findDuplicateBills, labourDue, oldestUnpaidDate } from "@/lib/summary";
+import { approvedNotBilled, findDuplicateBills, labourDue, oldestUnpaidDate } from "@/lib/summary";
 import { getDict } from "@/lib/i18n";
 import { daysBetween, formatDate, formatINR, formatMonth } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -42,7 +42,7 @@ export default async function HomePage({
   const q = (searchParams.q ?? "").trim();
   const type =
     searchParams.type === "estimate" || searchParams.type === "invoice" ? searchParams.type : "";
-  const show = ["unpaid", "duplicates"].includes(searchParams.show ?? "")
+  const show = ["unpaid", "duplicates", "unbilled"].includes(searchParams.show ?? "")
     ? searchParams.show!
     : "";
 
@@ -62,13 +62,27 @@ export default async function HomePage({
     .order("created_at", { ascending: false })
     .limit(1000);
 
-  const [{ data: clientRows }, { data: labourRows }] = await Promise.all([
+  const [{ data: clientRows }, { data: labourRows }, { data: spendRows }] = await Promise.all([
     supabase.from("clients").select("id, name").order("name"),
     // What has to leave his pocket on Saturday. Money out belongs beside
     // money in on the screen he opens first.
     supabase.from("worker_entries").select("worker_id, kind, amount"),
+    // Shop runs tagged to a customer that no bill has claimed. Only the
+    // sum per customer is wanted here — the picker on the bill form is
+    // where the individual lines belong.
+    supabase
+      .from("expenses")
+      .select("client_id, amount")
+      .not("client_id", "is", null)
+      .is("billed_document_id", null),
   ]);
   const owedToLabour = labourDue(labourRows ?? []);
+
+  const unbilledSpend = new Map<string, number>();
+  for (const e of spendRows ?? []) {
+    if (!e.client_id) continue;
+    unbilledSpend.set(e.client_id, (unbilledSpend.get(e.client_id) ?? 0) + Number(e.amount));
+  }
 
   const all = (allRaw ?? []) as unknown as HomeDoc[];
   const invoices = all.filter((d) => d.type === "invoice");
@@ -86,10 +100,24 @@ export default async function HomePage({
   // is something to say, and nothing at all when there is not.
   const duplicates = findDuplicateBills(all);
 
+  // ---- agreed, done, never billed ----
+  // An estimate is not money owed, so an approved one reaches none of the
+  // figures above and used to sit there in silence. This is the one case
+  // where the app knows the job was agreed and can see no bill for it.
+  const unbilled = approvedNotBilled(all);
+  const unbilledTotal = unbilled.reduce((s, d) => s + Number(d.total), 0);
+
   // ---- the list underneath ----
   let docs: HomeDoc[];
   if (show) {
-    docs = show === "unpaid" ? unpaid : show === "duplicates" ? duplicates : [];
+    docs =
+      show === "unpaid"
+        ? unpaid
+        : show === "duplicates"
+          ? duplicates
+          : show === "unbilled"
+            ? unbilled
+            : [];
   } else if (q) {
     // Straight to the database, so a bill from three years ago is findable.
     const safe = q.replace(/[,()*\\%]/g, " ").trim();
@@ -143,6 +171,18 @@ export default async function HomePage({
     status: string | null;
     /** Days since the oldest bill he is still owed on. 0 when none. */
     waiting: number;
+    /**
+     * What he has bought for a customer he has never billed at all.
+     *
+     * Only for customers with no bill, and deliberately so: a purchase
+     * made before `billed_document_id` existed carries no link, so on a
+     * customer who has been billed and paid it would read as unbilled
+     * work when it is nothing of the sort. With no bill on the books
+     * there is no such doubt — the money went out and nothing has gone
+     * back. Dinesh had ₹11,153 and 32 shop runs over four weeks against
+     * not one bill, not even a draft.
+     */
+    spentUnbilled: number;
   };
   const byClient = new Map<
     string,
@@ -202,10 +242,15 @@ export default async function HomePage({
         const from = x ? oldestUnpaidDate(x.docs) : null;
         return from ? daysBetween(from) : 0;
       })(),
+      spentUnbilled: (x?.bills ?? 0) === 0 ? (unbilledSpend.get(c.id) ?? 0) : 0,
     };
   });
   clientStates.sort((a, b) => {
     if (a.outstanding !== b.outstanding) return b.outstanding - a.outstanding; // who owes, first
+    // Then money he has laid out and never billed for. Below everyone who
+    // owes him — that is still the first question — but above the settled
+    // ones, where it would otherwise sink to the foot of the list unread.
+    if (a.spentUnbilled !== b.spentUnbilled) return b.spentUnbilled - a.spentUnbilled;
     if (a.last !== b.last) return b.last.localeCompare(a.last);
     return a.name.localeCompare(b.name);
   });
@@ -311,6 +356,20 @@ export default async function HomePage({
         </Link>
       )}
 
+      {unbilled.length > 0 && !show && !q && (
+        <Link
+          href="/?show=unbilled"
+          className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 px-4 py-3 font-semibold text-amber-900 no-underline"
+        >
+          <span>
+            {t.unbilledWork}
+            {" · "}
+            <span className="tnum font-extrabold">{formatINR(unbilledTotal, 0)}</span>
+          </span>
+          <span className="shrink-0 underline">{t.seeThem} →</span>
+        </Link>
+      )}
+
       {/* ---------- his customers ----------
            The list of bills that used to live here said the same thing
            four times over — every client's bills are on the client. This
@@ -364,6 +423,13 @@ export default async function HomePage({
                                   : t.waitingDays.replace("{n}", String(c.waiting))}
                               </span>
                             </>
+                          ) : c.spentUnbilled > 0.005 ? (
+                            <>
+                              {" · "}
+                              <span className="font-bold text-amber-700">
+                                {t.spentNotBilled.replace("{n}", formatINR(c.spentUnbilled, 0))}
+                              </span>
+                            </>
                           ) : c.last ? (
                             ` · ${formatDate(c.last)}`
                           ) : (
@@ -400,7 +466,11 @@ export default async function HomePage({
       {show ? (
         <div className="mt-6 flex items-center justify-between gap-3">
           <h2 className="eyebrow">
-            {show === "duplicates" ? t.possibleDuplicate : t.toCollect}
+            {show === "duplicates"
+              ? t.possibleDuplicate
+              : show === "unbilled"
+                ? t.unbilledWork
+                : t.toCollect}
           </h2>
           <Link href="/" className="text-sm font-bold text-accent">
             {t.showAllBills}
