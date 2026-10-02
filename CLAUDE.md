@@ -64,8 +64,9 @@ Vercel. PDFs are the browser's own print-to-PDF (`window.print()` + print CSS) �
 - Supabase project ref `vulktqvxxdgrbpxjxwzk`, org "Chandra E&E", **Singapore
   (ap-southeast-1)**. Vercel function region is pinned to **sin1** to match.
 - Env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (both in
-  `.env.local`, gitignored, and in Vercel). `GOOGLE_VISION_API_KEY` for the bill
-  scanner; optional `SCAN_PROVIDER=claude` + `ANTHROPIC_API_KEY` to switch
+  `.env.local`, gitignored, and in Vercel). `APP_LOGIN_EMAIL` is the one
+  account that signs in; see the login note below. `GOOGLE_VISION_API_KEY` for
+  the bill scanner; optional `SCAN_PROVIDER=claude` + `ANTHROPIC_API_KEY` to switch
   engines. With the Google key set and an Anthropic key also present, photos
   Google reads nothing off are retried on Claude automatically. Settings →
   Bill scanner runs a live check that names the exact fix when it fails.
@@ -598,6 +599,24 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **`business_profile.logo_url` is a path into `public/brand`**, chosen from
   `LOGO_OPTIONS`. A file whose name contains "lockup" already includes the
   business name, so the header suppresses the text name for those.
+- **The login screen asks for a password only, and must never stop being
+  Supabase Auth.** There is one account and there will only ever be one, so
+  typing an email address on a phone keyboard bought nothing.
+  `APP_LOGIN_EMAIL` holds it and `login` in `src/lib/actions.ts` fills it
+  in. It is server-side only — no `NEXT_PUBLIC_` — so the address never
+  reaches the browser. **The sign-in underneath is still
+  `signInWithPassword`, and that is not cosmetic:** twenty RLS policies
+  across seven migrations are written `auth.uid() = user_id`, so a password
+  gate of our own in front of an anonymous client would deny every row in
+  the database, and the only way around that would be a service-role key on
+  the server — which is every table's row security gone, on a database
+  holding his customers' names, what they owe and his bank details. If a
+  future change wants a PIN, a lock screen or a shared password, it goes
+  *in front of* a real Supabase session, never instead of one.
+- **The email field comes back when `APP_LOGIN_EMAIL` is unset**, and that
+  fallback is load-bearing: code and environment variables do not deploy
+  together, so whichever lands first he can still get in. Do not "simplify"
+  it away.
 - **The middleware matcher must exclude static files.** Anything it matches
   gets an `auth.getUser()` round-trip to Singapore, and a redirect to /login
   when logged out — which once meant the login screen fetched its fonts and

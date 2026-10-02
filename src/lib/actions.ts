@@ -13,9 +13,30 @@ import { STATES } from "@/lib/types";
 
 // ---------- auth ----------
 
+/**
+ * There is one user, and he is the only one there will be, so asking him
+ * to type an email address on a phone keyboard before he can see his own
+ * bills is a tax with nothing on the other side of it. `APP_LOGIN_EMAIL`
+ * holds the account and the server fills it in; he types a password.
+ *
+ * This stays a real `signInWithPassword` against Supabase Auth, which
+ * matters more than it looks: twenty RLS policies across seven migrations
+ * are written `auth.uid() = user_id`, so a password gate of our own in
+ * front of an anonymous client would deny every row in the database. The
+ * email moves off the screen; nothing moves out of Supabase.
+ *
+ * The variable is read server-side only — no `NEXT_PUBLIC_` — so the
+ * address never reaches the browser.
+ *
+ * When it is unset the form falls back to the email it was given, and the
+ * login page keeps rendering the field. That is deliberate: code and
+ * environment variables do not deploy together, and whichever lands first,
+ * he can still get in.
+ */
 export async function login(formData: FormData) {
   const supabase = supabaseServer();
-  const email = String(formData.get("email") ?? "").trim();
+  const configured = (process.env.APP_LOGIN_EMAIL ?? "").trim();
+  const email = configured || String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect("/login?error=1");

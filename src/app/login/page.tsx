@@ -3,6 +3,10 @@ import { getDict } from "@/lib/i18n";
 
 export default function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
   const t = getDict();
+  // With the account configured there is nothing to ask for but the
+  // password. Without it the field comes back, so an environment that has
+  // not caught up with a deploy locks nobody out.
+  const emailConfigured = Boolean((process.env.APP_LOGIN_EMAIL ?? "").trim());
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
       <div className="rise">
@@ -19,19 +23,21 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
         )}
 
         <form action={login} className="mt-8 space-y-5">
-          <div>
-            <label htmlFor="email" className="label">
-              {t.email}
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="field"
-            />
-          </div>
+          {!emailConfigured && (
+            <div>
+              <label htmlFor="email" className="label">
+                {t.email}
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="field"
+              />
+            </div>
+          )}
           <div>
             <label htmlFor="password" className="label">
               {t.password}
