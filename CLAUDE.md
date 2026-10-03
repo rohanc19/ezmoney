@@ -447,6 +447,29 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   recorded on `/day` instead, where he is already sitting with the
   receipts, and the client picker on that form is what ties it to a job.
   Do not put prices back on the list.
+- **What he charges is now shown against what he paid, and the unit is
+  half the comparison.** `src/lib/markup.ts` keys the price book on
+  *item and unit together*, and shows nothing at all where the two do not
+  match. This is not fussiness: "Gatta" is bought by the dozen at ₹10 and
+  sold by the piece at ₹2, which compared naively reads as losing ₹8 on
+  every one and is really a 140% markup. I made exactly that mistake
+  before writing the unit into the key. `paid` is the *dearest* fresh
+  sighting, never the cheapest — he has bought it at that price, so it is
+  the markup he can defend, and the cheapest would flatter every line and
+  hide the ones this exists to find. Stale prices (`STALE_DAYS`) raise
+  nothing. 20 assertions, the Gatta case among them.
+- **`markup.ts` is deliberately not part of `prices.ts`.** That file is
+  imported by DocumentForm, a client component sitting at the 106 kB
+  ceiling; this one is server-only and must stay that way. The rate card
+  held at 96.5 kB and the bill form did not move.
+- **`LOW_MARKUP` is measured against him, not against an idea of a fair
+  margin.** Across the 22 rate card lines comparable at the same unit in
+  Oct 2026 his markups ran 8% to 140%, median 40%, lower quartile ~26%.
+  30% is "meaningfully under what he normally charges". It flags 9 of the
+  22 — including tape at 25% on twenty-three bills, his most-billed line.
+  His list also holds the same item twice at different prices (Angular
+  holder ₹45 and Angular Holder ₹35), which the markup column makes
+  visible for the first time.
 - **The price book is a by-product of recording the day, never a chore.**
   It used to be a screen he fed by hand — add a shop, open it, type a
   price — and it held five prices across four shops in two years, which

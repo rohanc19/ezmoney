@@ -4,6 +4,8 @@ import { deleteRateCardItem, fixRateCardSpelling, saveRateCardItem } from "@/lib
 import { suggestForRateCard } from "@/lib/spelling-rate-card";
 import { formatINR } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
+import { indexPrices, markupFor } from "@/lib/markup";
+import type { PriceRow } from "@/lib/prices";
 import { supabaseServer } from "@/lib/supabase/server";
 import { UNITS } from "@/lib/types";
 
@@ -12,17 +14,23 @@ export const dynamic = "force-dynamic";
 export default async function RateCardPage({
   searchParams,
 }: {
-  searchParams: { saved?: string; fix?: string };
+  searchParams: { saved?: string; fix?: string; thin?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
-  const [{ data: items }, { data: profile }] = await Promise.all([
+  const [{ data: items }, { data: profile }, { data: prices }] = await Promise.all([
     supabase
       .from("rate_card_items")
       .select("*")
       .order("times_used", { ascending: false })
       .order("description"),
     supabase.from("business_profile").select("gst_enabled, default_hsn_sac").maybeSingle(),
+    // What he has actually paid. The price book is a by-product of the day
+    // book, so this costs him no extra typing — it is already there.
+    supabase
+      .from("item_prices")
+      .select("id, shop_id, item, item_key, unit, rate, seen_on, source")
+      .order("seen_on", { ascending: false }),
   ]);
 
   // What looks misspelled. Proposed only — nothing changes until he taps.
@@ -31,7 +39,23 @@ export default async function RateCardPage({
     .map((i) => ({ item: i, fixed: suggestForRateCard(i.description) }))
     .filter((r): r is { item: (typeof all)[number]; fixed: string } => r.fixed !== null);
   const fixing = searchParams.fix === "1";
-  const listed = fixing ? withFix.map((r) => r.item) : all;
+
+  // ---- what each rate is actually making him ----
+  // Only where the same thing, at the same unit, has a fresh price behind
+  // it. Everything else shows nothing rather than a guess.
+  const priceIndex = indexPrices((prices ?? []) as PriceRow[]);
+  const markups = new Map<string, ReturnType<typeof markupFor>>();
+  for (const i of all) {
+    markups.set(i.id, markupFor(Number(i.rate), i.unit ?? "", i.description ?? "", priceIndex));
+  }
+  const thinOnes = all.filter((i) => markups.get(i.id)?.thin);
+  const checkingThin = searchParams.thin === "1";
+
+  const listed = fixing
+    ? withFix.map((r) => r.item)
+    : checkingThin
+      ? thinOnes
+      : all;
 
   return (
     <main>
@@ -45,7 +69,7 @@ export default async function RateCardPage({
 
       {/* Spelling. These print in the biggest column of his customer's
           copy, so they are worth a look — but only ever on his say-so. */}
-      {withFix.length > 0 && !fixing && (
+      {withFix.length > 0 && !fixing && !checkingThin && (
         <Link
           href="/rate-card?fix=1"
           className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 p-3 font-semibold text-amber-900 no-underline"
@@ -53,6 +77,31 @@ export default async function RateCardPage({
           <span>{t.spellingToCheck.replace("{n}", String(withFix.length))}</span>
           <span className="shrink-0 underline">{t.checkSpellings} →</span>
         </Link>
+      )}
+
+      {/* What he charges against what the shop charged him. His own markups
+          run from 8% to 140% on comparable material, and the thin end
+          includes tape at 25% on twenty-three bills — he had no way of
+          knowing. Same shape as the spelling line above: absent unless
+          there is something to say, and it proposes, never changes. */}
+      {thinOnes.length > 0 && !fixing && !checkingThin && (
+        <Link
+          href="/rate-card?thin=1"
+          className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-amber-50 p-3 font-semibold text-amber-900 no-underline"
+        >
+          <span>{t.thinMarkupCount.replace("{n}", String(thinOnes.length))}</span>
+          <span className="shrink-0 underline">{t.seeThem} →</span>
+        </Link>
+      )}
+      {checkingThin && (
+        <div className="mt-4 rounded-2xl bg-amber-50 p-3">
+          <p className="font-semibold text-amber-900">
+            {thinOnes.length > 0 ? t.thinMarkupHint : t.allMarkupsFine}
+          </p>
+          <Link href="/rate-card" className="mt-1 inline-block text-sm font-bold underline">
+            ← {t.back}
+          </Link>
+        </div>
       )}
       {fixing && (
         <div className="mt-4 rounded-2xl bg-amber-50 p-3">
@@ -178,6 +227,21 @@ export default async function RateCardPage({
                   <span className="text-sm text-stone-500">
                     {formatINR(Number(i.rate), 0)} / {i.unit}
                     {i.times_used > 0 ? ` · ×${i.times_used}` : ""}
+                    {(() => {
+                      const m = markups.get(i.id);
+                      if (!m) return null;
+                      return (
+                        <>
+                          {" · "}
+                          <span className={m.thin ? "font-bold text-amber-700" : ""}>
+                            {t.youPaid.replace("{n}", formatINR(m.paid, 0))}
+                            {" · "}
+                            {m.rate >= 0 ? "+" : ""}
+                            {Math.round(m.rate * 100)}%
+                          </span>
+                        </>
+                      );
+                    })()}
                   </span>
                   <button type="submit" className="btn-secondary px-4">
                     {t.save}
