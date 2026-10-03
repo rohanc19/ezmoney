@@ -6,6 +6,31 @@
 // himself; if he forgets, the email is still a complete statement of
 // what is owed. For that reason nothing here claims a file is attached.
 
+/**
+ * A WhatsApp link, with or without the customer's number.
+ *
+ * This used to be given up on when no number was saved, which hid the
+ * button entirely — and only 3 of his 27 customers have one: 2 of the 10
+ * who owe him money, 1 of those whose bill is still unsent. So on almost
+ * every bill he most needed to send, the only thing on offer was a print
+ * dialog, and 8 of his 10 unpaid customers are sitting on drafts.
+ *
+ * `wa.me` needs no number. Without one WhatsApp opens its own contact
+ * picker and he chooses — which is the right way round anyway, since his
+ * customers are in his phone rather than in this app, and making him type
+ * a number into a form first is the chore that stopped it happening.
+ *
+ * Ten digits are assumed Indian and get a 91; anything longer is taken to
+ * carry its own country code already.
+ */
+export function waLink(phone: string | null | undefined, text: string): string {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  const msg = encodeURIComponent(text);
+  if (digits.length < 10) return `https://wa.me/?text=${msg}`;
+  const full = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${full}?text=${msg}`;
+}
+
 export interface BillEmailInput {
   type: "estimate" | "invoice";
   serial: string;

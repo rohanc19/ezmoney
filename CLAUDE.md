@@ -248,6 +248,25 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **Sharing is what marks a bill sent.** Save as PDF, WhatsApp and Gmail all
   call `markSentIfDraft`; there is no chore to remember. Ten bills in, every
   one of them was still a draft.
+- **The WhatsApp button needs no phone number, and hiding it was why the
+  bills never left.** Only **3 of his 27 customers have a number** — 2 of
+  the 10 who owe him money, 1 of those whose bill is still unsent — and
+  none has an email at all. `waLink` used to return null without one, so
+  on nearly every bill he most needed to send, the only thing on offer was
+  a print dialog. That is the real reason 8 of his 10 unpaid customers
+  are sitting on unsent drafts worth ₹24,698, and no amount of making the
+  share buttons louder would have fixed it. `wa.me/?text=` opens
+  WhatsApp's own contact picker: his customers live in his phone, not in
+  this app, and asking him to type a number into a form first was the
+  chore that stopped it. Ten digits are assumed Indian and get a 91;
+  longer numbers are taken to carry their own code. 12 assertions in
+  `src/lib/share.ts`. **Do not make the number required again** — adding a
+  phone field to the client form is not the fix, it is the thing that was
+  already optional and already skipped 24 times out of 27.
+- **A reminder quotes the balance, not the total.** Once a payment has
+  arrived the WhatsApp text says what is still owed; repeating the full
+  amount at a customer who has already paid ₹20,000 reads as though it
+  never landed.
 - **A checklist and a template are the same table.** Before a job he writes
   the materials for a section and hands the list to a shop, who tick down it
   and give him an invoice. A section template is a `checklists` row with

@@ -14,19 +14,13 @@ import {
 import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
 import { computeLineTaxes, computeTotals } from "@/lib/gst";
 import { docLabels, getDict } from "@/lib/i18n";
-import { buildBillEmail } from "@/lib/share";
+import { buildBillEmail, waLink } from "@/lib/share";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
 import { PAID_VIA, STATES, type Payment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function waLink(phone: string, text: string): string | null {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 10) return null;
-  const full = digits.length === 10 ? "91" + digits : digits;
-  return `https://wa.me/${full}?text=${encodeURIComponent(text)}`;
-}
 
 export default async function DocumentViewPage({
   params,
@@ -207,8 +201,16 @@ export default async function DocumentViewPage({
     profile?.state_name ||
     "";
 
-  const waText = `${title} ${doc.serial_no} — ${profile?.business_name ?? ""}\n${doc.site_job}\n${t.total}: ${formatINR(Number(doc.total))}${isInvoice && profile?.upi_id ? `\nUPI: ${profile.upi_id}` : ""}`;
-  const wa = client?.phone ? waLink(client.phone, waText) : null;
+  // The balance, not just the total, once part of it has arrived — the
+  // figure that matters to a customer who has already paid something is
+  // what is still owed, and a message repeating the full amount reads as
+  // though his ₹20,000 never landed.
+  const waText =
+    `${title} ${doc.serial_no} — ${profile?.business_name ?? ""}\n${doc.site_job}\n` +
+    `${t.total}: ${formatINR(Number(doc.total))}` +
+    (isInvoice && received > 0 ? `\n${t.balanceDue}: ${formatINR(balance)}` : "") +
+    (isInvoice && profile?.upi_id ? `\nUPI: ${profile.upi_id}` : "");
+  const wa = waLink(client?.phone, waText);
 
   // mailto: cannot attach the PDF, so the body carries the numbers and he
   // attaches the file he saved from the print view.
