@@ -297,7 +297,13 @@ export default async function MonthPage({
         </>
       )}
 
-      <Link href="/summary" className="mt-6 block text-center text-sm font-bold text-accent">
+      <Link
+        href={`/invoices?month=${key}`}
+        className="mt-6 block text-center text-sm font-bold text-accent"
+      >
+        {t.invoiceList} →
+      </Link>
+      <Link href="/summary" className="mt-3 block text-center text-sm font-bold text-accent">
         {t.seeTheYear} →
       </Link>
     </main>

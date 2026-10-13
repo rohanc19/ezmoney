@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formatDate } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,75 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "Content-Disposition": `attachment; filename="ezmoney-backup-${today}.json"`,
+      },
+    });
+  }
+
+  // The invoice register as he keeps it in Excel: his six columns, then
+  // the site and whether it went out. Figures are bare numbers — no ₹, no
+  // commas — so Excel can sum and sort them; dates are dd-mmm-yyyy, which
+  // Excel reads as dates.
+  if (what === "invoices") {
+    const ISO = /^\d{4}-\d{2}-\d{2}$/;
+    const from = request.nextUrl.searchParams.get("from") ?? "";
+    const to = request.nextUrl.searchParams.get("to") ?? "";
+    if (!ISO.test(from) || !ISO.test(to)) {
+      return NextResponse.json({ error: "choose the dates first" }, { status: 400 });
+    }
+    const { data, error } = await supabase
+      .from("documents")
+      .select("serial_no, doc_date, site_job, status, total, amount_received, clients(name)")
+      .eq("type", "invoice")
+      .gte("doc_date", from)
+      .lte("doc_date", to)
+      .order("doc_date")
+      .order("serial_no")
+      .limit(5000);
+    if (error) return NextResponse.json({ error: "export failed" }, { status: 500 });
+
+    const status: Record<string, string> = {
+      draft: "Not sent",
+      sent: "Sent",
+      partly_paid: "Part paid",
+      paid: "Paid",
+    };
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    let amount = 0;
+    let paid = 0;
+    const rows: Record<string, unknown>[] = (data ?? []).map((d) => {
+      const c = d.clients as unknown as { name: string } | null;
+      amount += Number(d.total);
+      paid += Number(d.amount_received);
+      return {
+        "Invoice No": d.serial_no,
+        "Invoice Date": formatDate(d.doc_date),
+        Customer: c?.name ?? "",
+        Amount: r2(Number(d.total)),
+        Paid: r2(Number(d.amount_received)),
+        Balance: r2(Number(d.total) - Number(d.amount_received)),
+        "Site / Job": d.site_job ?? "",
+        Status: status[d.status] ?? d.status,
+      };
+    });
+    if (rows.length > 0) {
+      rows.push(
+        Object.fromEntries(Object.keys(rows[0]).map((k) => [k, ""])),
+        {
+          "Invoice No": "TOTAL",
+          "Invoice Date": "",
+          Customer: "",
+          Amount: r2(amount),
+          Paid: r2(paid),
+          Balance: r2(amount - paid),
+          "Site / Job": "",
+          Status: "",
+        }
+      );
+    }
+    return new NextResponse("\uFEFF" + toCsv(rows), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="invoices-${from}-to-${to}.csv"`,
       },
     });
   }

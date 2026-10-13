@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getDict } from "@/lib/i18n";
-import { formatINR, formatMonth } from "@/lib/format";
+import { formatINR, formatIndianNumber, formatMonth } from "@/lib/format";
 import {
   averageDaysToPay,
   jobSizeBuckets,
+  monthMoney,
   monthSeries,
   topBy,
   type SummaryDoc,
@@ -55,10 +56,10 @@ export default async function SummaryPage({
       .gte("paid_on", from)
       .lte("paid_on", to)
       .limit(2000),
-    supabase.from("expenses").select("amount").gte("date", from).lte("date", to),
+    supabase.from("expenses").select("date, amount").gte("date", from).lte("date", to),
     supabase
       .from("worker_entries")
-      .select("amount")
+      .select("entry_date, kind, amount")
       .neq("kind", "work")
       .gte("entry_date", from)
       .lte("entry_date", to),
@@ -98,6 +99,23 @@ export default async function SummaryPage({
   // ---- month by month ----
   const months = monthSeries(invoices, year);
   const peak = Math.max(...months, 0);
+
+  // He asked for the month as a table, the way his Excel sheet reads:
+  // billed, received, spent, left — one row a month, each opening /month.
+  // Same monthMoney as /month, so the two screens cannot disagree.
+  const monthRows = Array.from({ length: 12 }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+    return {
+      key,
+      ...monthMoney({
+        monthKey: key,
+        docs: invoices.map((d) => ({ ...d, type: "invoice" })),
+        payments,
+        expenses: (expensesRaw ?? []) as { date: string; amount: number }[],
+        labour: (labourRaw ?? []) as { entry_date: string; kind: string; amount: number }[],
+      }),
+    };
+  }).filter((m) => m.billed || m.received || m.spent);
 
   // ---- who pays him ----
   const byClient = new Map<string, { billed: number; count: number; docs: SummaryDoc[] }>();
@@ -222,6 +240,13 @@ export default async function SummaryPage({
             </dl>
           </div>
 
+          <Link
+            href={`/invoices?from=${from}&to=${to}`}
+            className="no-print mt-3 block text-center text-sm font-bold text-accent"
+          >
+            {t.invoiceList} →
+          </Link>
+
           {/* ---- month by month: plain SVG, no chart library ---- */}
           {peak > 0 && (
             <section className="card mt-4 p-4">
@@ -248,6 +273,53 @@ export default async function SummaryPage({
               </svg>
               <p className="mt-1 text-center text-xs text-stone-500">
                 {t.tallestBar}: {formatINR(peak, 0)}
+              </p>
+            </section>
+          )}
+
+          {monthRows.length > 0 && (
+            <section className="card mt-4 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[0.8rem]">
+                  <thead className="bg-stone-50 text-xs text-stone-600">
+                    <tr>
+                      <th className="py-2 pl-3 pr-1 text-left font-bold">{t.month}</th>
+                      <th className="px-1.5 py-2 text-right font-bold">{t.billedToday}</th>
+                      <th className="px-1.5 py-2 text-right font-bold">{t.receivedToday}</th>
+                      <th className="px-1.5 py-2 text-right font-bold">{t.spentToday}</th>
+                      <th className="py-2 pl-1.5 pr-3 text-right font-bold">{t.leftCol}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {monthRows.map((m) => (
+                      <tr key={m.key}>
+                        <td className="p-0">
+                          <Link
+                            href={`/month?m=${m.key}`}
+                            className="block min-h-[44px] py-3 pl-3 pr-1 font-bold text-accent"
+                          >
+                            {formatMonth(`${m.key}-01`).slice(0, 3)}
+                          </Link>
+                        </td>
+                        <td className="tnum px-1.5 text-right">{formatIndianNumber(m.billed, 0)}</td>
+                        <td className="tnum px-1.5 text-right text-green-800">
+                          {formatIndianNumber(m.received, 0)}
+                        </td>
+                        <td className="tnum px-1.5 text-right">{formatIndianNumber(m.spent, 0)}</td>
+                        <td
+                          className={`tnum pl-1.5 pr-3 text-right font-bold ${
+                            (m.left ?? 0) < 0 ? "text-red-700" : ""
+                          }`}
+                        >
+                          {m.left === null ? "—" : formatIndianNumber(m.left, 0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="no-print border-t border-line p-2 text-center text-xs text-stone-500">
+                {t.tapMonthForMore}
               </p>
             </section>
           )}

@@ -746,6 +746,24 @@ button.card:active {
     border-width: 1px;
     margin: 0 !important;
   }
+  /* He said his bills print "dull" while everything else from the same
+     printer is fine. The sheet was drawn in warm greys — labels at
+     #7a736a, the address at #5f5952, hairlines at #b8b1a3 — and Manrope
+     at its regular weight is thin at 12px. A mono laser cannot print
+     grey; it prints a screen of dots, so every one of those came out
+     faded. On paper the sheet is black ink: every word solid, a heavier
+     body weight, and rules dark enough to survive a worn toner. */
+  .doc {
+    --doc-ink: #000;
+    --doc-rule: #333;
+    font-weight: 500;
+    color: #000;
+  }
+  /* Plain `.doc *`, not a :not(svg *) — an older Chrome drops a whole
+     rule it cannot parse. The UPI QR draws with fill, not colour. */
+  .doc * {
+    color: #000 !important;
+  }
   .doc-title {
     padding-top: 0.35rem;
     padding-bottom: 0.35rem;

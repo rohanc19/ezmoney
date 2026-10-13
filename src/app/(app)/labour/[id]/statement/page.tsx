@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import PeriodPicker from "@/components/PeriodPicker";
 import PrintButton from "@/components/PrintButton";
-import {
-  addDays,
-  formatDayShort,
-  formatINR,
-  formatIndianNumber,
-  formatMonth,
-  todayISO,
-} from "@/lib/format";
+import { addDays, formatDayShort, formatINR, formatIndianNumber, todayISO } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
+import {
+  monthPeriod,
+  periodFromParams,
+  periodLabel,
+  shiftMonth,
+  weekPeriod,
+} from "@/lib/period";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { WorkerEntry } from "@/lib/types";
 
@@ -17,26 +18,12 @@ export const dynamic = "force-dynamic";
 
 // What a man asks for when he wants to know where he stands: every day he
 // worked, every rupee taken in advance, every rupee paid, and the balance
-// at the end — for one month, on one sheet he can be handed or sent.
+// at the end — on one sheet he can be handed or sent. A month by
+// default; he asked to choose the dates too, because the men are settled
+// by the week and a dispute is about "since the 6th", not about October.
 //
 // It is built from the same worker_entries the labour book is, so it can
 // never disagree with what the app shows; nothing here is stored.
-
-function monthKeyOf(iso: string): string {
-  return iso.slice(0, 7);
-}
-function firstOf(key: string): string {
-  return `${key}-01`;
-}
-function lastOf(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  return addDays(`${y}-${String(m).padStart(2, "0")}-01`, 32).slice(0, 8) + "01";
-}
-function shiftMonth(key: string, by: number): string {
-  const [y, m] = key.split("-").map(Number);
-  const d = new Date(y, m - 1 + by, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 function waLink(phone: string, text: string): string | null {
   const digits = phone.replace(/\D/g, "");
@@ -49,16 +36,17 @@ export default async function WorkerStatementPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { month?: string };
+  searchParams: { month?: string; from?: string; to?: string };
 }) {
   const t = getDict();
   const supabase = supabaseServer();
 
-  const monthKey = /^\d{4}-\d{2}$/.test(searchParams.month ?? "")
-    ? searchParams.month!
-    : monthKeyOf(todayISO());
-  const from = firstOf(monthKey);
-  const to = firstOf(shiftMonth(monthKey, 1));
+  const period = periodFromParams(searchParams);
+  const { from } = period;
+  const to = addDays(period.to, 1); // exclusive, for the comparisons below
+  const label = periodLabel(period);
+  const today = todayISO();
+  const thisMonth = today.slice(0, 7);
 
   const [{ data: worker }, { data: entriesRaw }, { data: profile }] = await Promise.all([
     supabase.from("workers").select("*").eq("id", params.id).maybeSingle(),
@@ -101,7 +89,7 @@ export default async function WorkerStatementPage({
 
   const summaryText =
     `${profile?.business_name ?? ""}\n` +
-    `${worker.name} — ${formatMonth(from)}\n` +
+    `${worker.name} — ${label}\n` +
     `${t.workedDays}: ${formatIndianNumber(daysWorked, 0)}\n` +
     `${t.earned}: ${formatINR(earned, 0)}\n` +
     (advances > 0 ? `${t.advanceTaken}: ${formatINR(advances, 0)}\n` : "") +
@@ -119,23 +107,17 @@ export default async function WorkerStatementPage({
           <h1 className="truncate text-2xl font-extrabold">{t.statement}</h1>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href={`/labour/${worker.id}/statement?month=${shiftMonth(monthKey, -1)}`}
-            aria-label={t.prevMonth}
-            className="btn-secondary min-h-[44px] px-3 text-xl font-bold"
-          >
-            ‹
-          </Link>
-          <p className="text-center font-extrabold">{formatMonth(from)}</p>
-          <Link
-            href={`/labour/${worker.id}/statement?month=${shiftMonth(monthKey, 1)}`}
-            aria-label={t.nextMonth}
-            className="btn-secondary min-h-[44px] px-3 text-xl font-bold"
-          >
-            ›
-          </Link>
-        </div>
+        <PeriodPicker
+          path={`/labour/${worker.id}/statement`}
+          period={period}
+          t={t}
+          shortcuts={[
+            { label: t.thisWeek, period: weekPeriod(today) },
+            { label: t.lastWeek, period: weekPeriod(addDays(today, -7)) },
+            { label: t.thisMonth, period: monthPeriod(thisMonth) },
+            { label: t.lastMonth, period: monthPeriod(shiftMonth(thisMonth, -1)) },
+          ]}
+        />
 
         <div className="mt-4 space-y-2">
           <PrintButton label={t.saveAsPdf} />
@@ -167,8 +149,8 @@ export default async function WorkerStatementPage({
               <span className="font-bold">{worker.name}</span>
             </p>
             <p className="doc-kv">
-              <span>Month</span>
-              <span>{formatMonth(from)}</span>
+              <span>{period.monthKey ? "Month" : "Period"}</span>
+              <span>{label}</span>
             </p>
             {worker.skill && (
               <p className="doc-kv">
@@ -248,7 +230,7 @@ export default async function WorkerStatementPage({
               <span className="tnum">{formatINR(Math.abs(closing))}</span>
             </p>
             <p className="mt-2 text-[0.72rem] leading-snug text-stone-500">
-              {t.statementFor} {worker.name} · {formatMonth(from)}
+              {t.statementFor} {worker.name} · {label}
             </p>
           </div>
         </div>
