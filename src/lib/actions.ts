@@ -9,6 +9,7 @@ import { todayISO } from "@/lib/format";
 import { itemKey } from "@/lib/prices";
 import { suggestForRateCard } from "@/lib/spelling-rate-card";
 import { supabaseServer } from "@/lib/supabase/server";
+import { splitDay } from "@/lib/split";
 import { STATES } from "@/lib/types";
 
 // ---------- auth ----------
@@ -1255,28 +1256,99 @@ export async function markWorkedThisDay(formData: FormData) {
   const rate = Number(worker.daily_rate) || 0;
   if (rate <= 0) redirect(back); // no wage set yet — nothing to record
 
-  const { error } = await supabase.from("worker_entries").insert({
-    user_id: user.id,
-    worker_id,
-    entry_date: day,
-    kind: "work",
-    days: 1,
-    rate,
-    amount: rate,
-    site_job: String(formData.get("site_job") ?? "").trim(),
-    // Job costing reads this and nothing else, and this form writes 18 of
-    // every 19 work rows — so leaving it off here is what kept labour out
-    // of every margin the app shows. Empty stays empty: a day split across
-    // three sites has no one client, and guessing one would put a whole
-    // day's wage on a job that saw a third of it.
-    client_id: String(formData.get("client_id") ?? "") || null,
-  });
+  // Job costing reads client_id and nothing else, and this form writes
+  // almost every work row — so leaving it off is what kept labour out of
+  // every margin the app shows. He ticks every customer the man worked
+  // for; the day becomes one row per customer. None ticked stays one
+  // untagged row: guessing would put a whole day's wage on a job that
+  // saw a third of it.
+  const { error } = await supabase
+    .from("worker_entries")
+    .insert(
+      splitRows(formData, rate, 1).map((r) => ({
+        user_id: user.id,
+        worker_id,
+        entry_date: day,
+        kind: "work",
+        rate,
+        site_job: String(formData.get("site_job") ?? "").trim(),
+        ...r,
+      }))
+    );
   if (error) throw error;
 
   revalidatePath(back);
   revalidatePath(`/labour/${worker_id}`);
   revalidatePath("/labour");
   redirect(back);
+}
+
+/**
+ * The customers ticked on a day form, with what he typed against each
+ * (`share_<client_id>`), turned into work rows by `splitDay`. A customer
+ * whose share came to nothing is dropped — a ₹0 row on a job is noise.
+ */
+function splitRows(formData: FormData, amount: number, days: number) {
+  const ids = Array.from(
+    new Set(formData.getAll("client_id").map(String).filter(Boolean))
+  );
+  if (ids.length === 0) return [{ client_id: null, amount: round2(amount), days }];
+  const typed = ids.map((id) => {
+    const v = Number(String(formData.get(`share_${id}`) ?? "").replace(/[^\d.]/g, ""));
+    return v > 0 ? v : null;
+  });
+  const parts = splitDay(amount, days, typed)
+    .map((p, i) => ({ client_id: ids[i] as string | null, ...p }))
+    .filter((p) => p.amount > 0 || amount === 0);
+  return parts.length > 0 ? parts : [{ client_id: null, amount: round2(amount), days }];
+}
+
+/**
+ * Say where an untagged day went. Most of his work rows were written
+ * before a day could be split — 24 of 25 carry no customer — so this
+ * takes one of them and replaces it with a row per customer, keeping its
+ * amount and days exactly. The new rows go in before the old one comes
+ * out, so a failure half way never loses a day's wage.
+ */
+export async function splitWorkEntry(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const back = String(formData.get("return_to") ?? "") || "/labour";
+
+  const { data: row } = await supabase
+    .from("worker_entries")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .eq("kind", "work")
+    .maybeSingle();
+  if (!row || formData.getAll("client_id").filter(Boolean).length === 0) redirect(back);
+
+  const { error } = await supabase.from("worker_entries").insert(
+    splitRows(formData, Number(row.amount), Number(row.days)).map((r) => ({
+      user_id: user.id,
+      worker_id: row.worker_id,
+      entry_date: row.entry_date,
+      kind: "work",
+      rate: row.rate,
+      site_job: row.site_job,
+      paid_via: row.paid_via,
+      notes: row.notes,
+      ...r,
+    }))
+  );
+  if (error) throw error;
+  const { error: delError } = await supabase
+    .from("worker_entries")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (delError) throw delError;
+
+  revalidatePath(back);
+  revalidatePath(`/labour/${row.worker_id}`);
+  revalidatePath("/labour");
+  redirect(`${back}?saved=1`);
 }
 
 /** Settle the week: one payment for what is left after any advances. */

@@ -479,6 +479,12 @@ const dict = {
     noInvoicesInPeriod: "No invoices in these dates.",
     leftCol: "Left",
     tapMonthForMore: "Tap a month to see everything in it.",
+    whoFor: "Who was it for? Tick each one",
+    whoForHint: "The day's wage is shared between them. Type an amount to give one more.",
+    shareEvenly: "shared",
+    anotherCustomer: "Another customer",
+    saveWhereWorked: "Save where he worked",
+    untaggedDay: "This day is not on any customer yet, so it is missing from their job cost.",
   },
   kn: {
     appName: "EzMoney",
@@ -937,6 +943,12 @@ const dict = {
     noInvoicesInPeriod: "ಈ ದಿನಾಂಕಗಳಲ್ಲಿ ಬಿಲ್ ಇಲ್ಲ.",
     leftCol: "ಉಳಿದದ್ದು",
     tapMonthForMore: "ತಿಂಗಳನ್ನು ಒತ್ತಿ ಎಲ್ಲವನ್ನೂ ನೋಡಿ.",
+    whoFor: "ಯಾರ ಕೆಲಸ? ಪ್ರತಿಯೊಬ್ಬರನ್ನೂ ಟಿಕ್ ಮಾಡಿ",
+    whoForHint: "ದಿನದ ಕೂಲಿ ಅವರ ನಡುವೆ ಹಂಚಲಾಗುತ್ತದೆ. ಒಬ್ಬರಿಗೆ ಹೆಚ್ಚು ಕೊಡಲು ಮೊತ್ತ ಬರೆಯಿರಿ.",
+    shareEvenly: "ಹಂಚಿಕೆ",
+    anotherCustomer: "ಬೇರೆ ಗ್ರಾಹಕ",
+    saveWhereWorked: "ಎಲ್ಲಿ ಕೆಲಸ ಮಾಡಿದರು ಉಳಿಸಿ",
+    untaggedDay: "ಈ ದಿನ ಯಾವ ಗ್ರಾಹಕರಿಗೂ ಸೇರಿಲ್ಲ, ಆದ್ದರಿಂದ ಅವರ ಕೆಲಸದ ಖರ್ಚಿನಲ್ಲಿ ಇಲ್ಲ.",
   },
 };
 

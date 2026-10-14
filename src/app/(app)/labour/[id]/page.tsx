@@ -66,7 +66,9 @@ export default async function WorkerBookPage({
     const rows = inWeek.filter((e) => e.kind === "work" && e.entry_date === d);
     return {
       date: d,
-      days: rows.reduce((s2, r) => s2 + Number(r.days), 0),
+      // A day split across sites is several rows of 0.5 or 0.33 — rounded,
+      // so three thirds make the 1 that earns a tick.
+      days: Math.round(rows.reduce((s2, r) => s2 + Number(r.days), 0) * 100) / 100,
       amount: rows.reduce((s2, r) => s2 + Number(r.amount), 0),
       count: rows.length,
     };

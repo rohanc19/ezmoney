@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ConfirmButton from "@/components/ConfirmButton";
-import { deleteWorkerEntry, markWorkedThisDay, saveWorkerEntry } from "@/lib/actions";
+import {
+  deleteWorkerEntry,
+  markWorkedThisDay,
+  saveWorkerEntry,
+  splitWorkEntry,
+} from "@/lib/actions";
 import { formatDate, formatINR, mondayOf } from "@/lib/format";
 import { getDict } from "@/lib/i18n";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -26,8 +31,13 @@ export default async function WorkerDayPage({
   const date = params.date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
 
-  const [{ data: worker }, { data: rowsRaw }, { data: clients }, { data: dayBuys }] =
-    await Promise.all([
+  const [
+    { data: worker },
+    { data: rowsRaw },
+    { data: clients },
+    { data: dayBuys },
+    { data: dayBills },
+  ] = await Promise.all([
       supabase.from("workers").select("*").eq("id", params.id).maybeSingle(),
       supabase
         .from("worker_entries")
@@ -39,6 +49,9 @@ export default async function WorkerDayPage({
       // Who he bought materials for on this date. The strongest thing the
       // app knows about where the day went, and it is already recorded.
       supabase.from("expenses").select("client_id").eq("date", date).not("client_id", "is", null),
+      // And who he billed that day — a bill is usually written the day the
+      // job finishes, with the men still on it.
+      supabase.from("documents").select("client_id").eq("doc_date", date).not("client_id", "is", null),
     ]);
   if (!worker) notFound();
 
@@ -47,8 +60,14 @@ export default async function WorkerDayPage({
   // is one of his own entries — and putting a whole day's wage on one of
   // them would make a job margin confidently wrong, which is worse than
   // leaving it short. Several, or none, and he picks.
-  const dayClientIds = Array.from(new Set((dayBuys ?? []).map((e) => e.client_id as string)));
-  const suggestedClient = dayClientIds.length === 1 ? dayClientIds[0] : "";
+  const dayClientIds = Array.from(
+    new Set([...(dayBuys ?? []), ...(dayBills ?? [])].map((e) => e.client_id as string))
+  );
+  const clientName = new Map((clients ?? []).map((c) => [c.id, c.name as string]));
+  const dayClients = dayClientIds
+    .filter((id) => clientName.has(id))
+    .map((id) => ({ id, name: clientName.get(id)! }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const rows = (rowsRaw ?? []) as unknown as WorkerEntry[];
   const sum = (kind: string) =>
@@ -56,6 +75,8 @@ export default async function WorkerDayPage({
   const earned = sum("work");
   const advance = sum("advance");
   const paid = sum("payment");
+  // A day recorded before it could be split — most of them were.
+  const untagged = rows.find((r) => r.kind === "work" && !r.client_id);
 
   const here = `/labour/${worker.id}/day/${date}`;
   const backToWeek = `/labour/${worker.id}?week=${mondayOf(date)}`;
@@ -118,6 +139,57 @@ export default async function WorkerDayPage({
         {t.save}
       </button>
     </form>
+  );
+
+  /**
+   * Who the day was for. One tick per customer; the wage is shared evenly
+   * unless he types a figure against one. Only one customer that day is
+   * the one case safe to tick for him — several, and he says which.
+   */
+  const WhoFor = () => (
+    // min-w-0: a fieldset will not shrink below its content by default,
+    // which pushed the amount boxes 23px off a 375px phone.
+    <fieldset className="min-w-0 space-y-2">
+      <legend className="label">{t.whoFor}</legend>
+      {dayClients.map((c) => (
+        <div key={c.id} className="flex items-center gap-2">
+          <label className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 rounded-xl border-2 border-line bg-white px-3">
+            <input
+              type="checkbox"
+              name="client_id"
+              value={c.id}
+              defaultChecked={dayClients.length === 1}
+              className="h-5 w-5 shrink-0 accent-accent"
+            />
+            <span className="py-2 font-semibold leading-tight">{c.name}</span>
+          </label>
+          <div className="w-[4.5rem] shrink-0">
+            <input
+              name={`share_${c.id}`}
+              inputMode="decimal"
+              placeholder={t.shareEvenly}
+              aria-label={`${c.name} ₹`}
+              className="field tnum"
+            />
+          </div>
+        </div>
+      ))}
+      <select name="client_id" defaultValue="" className="field" aria-label={t.anotherCustomer}>
+        <option value="">
+          {dayClients.length > 0 ? `+ ${t.anotherCustomer}` : `${t.forClient} —`}
+        </option>
+        {(clients ?? [])
+          .filter((c) => !dayClientIds.includes(c.id))
+          .map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+      </select>
+      {dayClients.length > 1 && (
+        <p className="text-xs leading-snug text-stone-500">{t.whoForHint}</p>
+      )}
+    </fieldset>
   );
 
   return (
@@ -248,36 +320,40 @@ export default async function WorkerDayPage({
         )}
       </div>
 
-      {/* ---- the common case: he worked, here ----
-           The customer sits on this form, not only on the folded-away one:
-           this button writes almost every work row there is, and without it
-           labour reached no job margin at all. */}
-      <form action={markWorkedThisDay} className="mt-4 space-y-2">
-        <input type="hidden" name="worker_id" value={worker.id} />
-        <input type="hidden" name="day" value={date} />
-        <input type="hidden" name="return_to" value={here} />
-        <input name="site_job" placeholder={t.whereWorked} className="field" />
-        <select name="client_id" defaultValue={suggestedClient} className="field" aria-label={t.forClient}>
-          <option value="">{t.forClient} —</option>
-          {(clients ?? [])
-            .slice()
-            .sort((a, b) => {
-              // Whoever he bought for today, at the top of a list he scrolls
-              // on a phone — the rest stay in their usual order.
-              const aDay = dayClientIds.includes(a.id) ? 0 : 1;
-              const bDay = dayClientIds.includes(b.id) ? 0 : 1;
-              return aDay - bDay || a.name.localeCompare(b.name);
-            })
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-        </select>
-        <button type="submit" className="btn-primary w-full">
-          + {t.workedThisDay}
-        </button>
-      </form>
+      {untagged ? (
+        /* ---- a day already recorded, on no customer ----
+             Shown in place of "+ Worked this day": the day is already
+             there, and the thing missing is where it went. */
+        <form action={splitWorkEntry} className="card mt-4 space-y-3 border-amber-300 p-3">
+          <input type="hidden" name="id" value={untagged.id} />
+          <input type="hidden" name="return_to" value={here} />
+          <p className="text-sm leading-snug text-amber-900">
+            {t.untaggedDay}
+            {untagged.site_job ? (
+              <span className="mt-1 block font-bold text-ink">“{untagged.site_job}”</span>
+            ) : null}
+          </p>
+          <WhoFor />
+          <button type="submit" className="btn-primary w-full">
+            {t.saveWhereWorked}
+          </button>
+        </form>
+      ) : (
+        /* ---- the common case: he worked, here ----
+           The customers sit on this form, not only on the folded-away one:
+           this button writes almost every work row there is, and without
+           them labour reached no job margin at all. */
+        <form action={markWorkedThisDay} className="mt-4 space-y-3">
+          <input type="hidden" name="worker_id" value={worker.id} />
+          <input type="hidden" name="day" value={date} />
+          <input type="hidden" name="return_to" value={here} />
+          <input name="site_job" placeholder={t.whereWorked} className="field" />
+          <WhoFor />
+          <button type="submit" className="btn-primary w-full">
+            + {t.workedThisDay}
+          </button>
+        </form>
+      )}
 
       {/* ---- everything else, folded away ---- */}
       <div className="mt-4 space-y-2">
