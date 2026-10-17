@@ -12,6 +12,7 @@ export default function ShareActions({
   documentId,
   isDraft,
   pdfLabel,
+  a5Label,
   waHref,
   waLabel,
   mailHref,
@@ -20,6 +21,7 @@ export default function ShareActions({
   documentId: string;
   isDraft: boolean;
   pdfLabel: string;
+  a5Label: string;
   waHref: string | null;
   waLabel: string;
   mailHref: string | null;
@@ -45,6 +47,28 @@ export default function ShareActions({
         }}
       >
         {pdfLabel}
+      </button>
+
+      {/* A5 is the half sheet his bill books were. The sheet is laid out
+          for A4, so rather than a second layout it is the same one,
+          scaled: a page size for this print only, and a class the print
+          CSS shrinks the bill by. Both come off again once the dialog
+          closes, so the next ordinary print is A4 as before. */}
+      <button
+        type="button"
+        className="mt-1 block min-h-[44px] w-full text-center text-sm font-bold text-accent"
+        onClick={() => {
+          const page = document.createElement("style");
+          page.textContent = "@page { size: A5; margin: 6mm; }";
+          document.head.appendChild(page);
+          document.documentElement.classList.add("print-a5");
+          window.print();
+          document.documentElement.classList.remove("print-a5");
+          page.remove();
+          markSent();
+        }}
+      >
+        {a5Label}
       </button>
 
       {(waHref || mailHref) && (

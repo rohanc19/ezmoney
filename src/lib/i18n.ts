@@ -485,6 +485,7 @@ const dict = {
     anotherCustomer: "Another customer",
     saveWhereWorked: "Save where he worked",
     untaggedDay: "This day is not on any customer yet, so it is missing from their job cost.",
+    printOnA5: "Print on A5 (half sheet)",
   },
   kn: {
     appName: "EzMoney",
@@ -949,6 +950,7 @@ const dict = {
     anotherCustomer: "ಬೇರೆ ಗ್ರಾಹಕ",
     saveWhereWorked: "ಎಲ್ಲಿ ಕೆಲಸ ಮಾಡಿದರು ಉಳಿಸಿ",
     untaggedDay: "ಈ ದಿನ ಯಾವ ಗ್ರಾಹಕರಿಗೂ ಸೇರಿಲ್ಲ, ಆದ್ದರಿಂದ ಅವರ ಕೆಲಸದ ಖರ್ಚಿನಲ್ಲಿ ಇಲ್ಲ.",
+    printOnA5: "A5 ನಲ್ಲಿ ಪ್ರಿಂಟ್ (ಅರ್ಧ ಹಾಳೆ)",
   },
 };
 

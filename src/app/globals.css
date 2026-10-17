@@ -690,6 +690,17 @@ button.card:active {
   padding: 0.55rem 0.9rem 0.6rem;
   text-align: center;
 }
+/* His signature sits on the line it signs, where the pen would. */
+.doc-sign-img {
+  display: block;
+  margin: 0.5rem auto 0;
+  height: 2.4rem;
+  width: auto;
+  max-width: 100%;
+}
+.doc-sign-img + .doc-sign-line {
+  margin-top: 0.1rem;
+}
 .doc-sign-line {
   margin-top: 2.6rem;
   border-top: 1px solid var(--doc-ink);
@@ -800,5 +811,18 @@ button.card:active {
   @page {
     size: A4;
     margin: 12mm 10mm;
+  }
+  /* A5, from "Print on A5": the A4 sheet, scaled. zoom (not transform)
+     because it shrinks the layout box too, so the bill lays out at its
+     A4 width and then occupies the half sheet — no second layout to keep
+     in step with the first. 136mm of A5 against 190mm of A4 is 0.72,
+     and at that a 15-line bill (INV-2026-040) fits one sheet once the
+     blank filler rows — there to give an A4 bill some body — are gone.
+     A longer bill runs onto a second sheet with its headings repeated. */
+  .print-a5 .doc {
+    zoom: 0.72;
+  }
+  .print-a5 .doc-grid-filler {
+    display: none;
   }
 }

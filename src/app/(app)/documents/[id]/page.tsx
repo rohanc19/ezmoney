@@ -15,6 +15,7 @@ import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } fr
 import { computeLineTaxes, computeTotals } from "@/lib/gst";
 import { docLabels, getDict } from "@/lib/i18n";
 import { buildBillEmail, waLink } from "@/lib/share";
+import { SIGNATURE_DATA_URI } from "@/lib/signature";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
 import { PAID_VIA, STATES, type Payment } from "@/lib/types";
@@ -254,6 +255,7 @@ export default async function DocumentViewPage({
           documentId={doc.id}
           isDraft={doc.status === "draft"}
           pdfLabel={t.saveAsPdf}
+          a5Label={t.printOnA5}
           waHref={wa}
           waLabel={t.sendOnWhatsApp}
           mailHref={mail?.gmailHref ?? null}
@@ -974,6 +976,13 @@ export default async function DocumentViewPage({
               <p className="mt-1 text-[0.85rem] font-extrabold">
                 {docLabels.signFor} {profile?.business_name}
               </p>
+              {/* He asked for his signature on every invoice. Not on an
+                  estimate: a quote is signed when it is accepted, which is
+                  what the "Approved by" line below is for. */}
+              {isInvoice && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={SIGNATURE_DATA_URI} alt="" className="doc-sign-img" />
+              )}
               <p className="doc-sign-line">{docLabels.authorisedSignatory}</p>
               {!isInvoice && (
                 <p className="mt-3 text-left text-[0.7rem] text-stone-600">

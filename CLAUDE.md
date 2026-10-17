@@ -691,6 +691,19 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   every delete in the app stops working silently, with nothing on screen to
   explain it. `ConfirmButton` arms in place instead: first tap arms, second
   submits, and it disarms itself after six seconds.
+- **His signature is a data URI, never a file in `public/`.**
+  `src/lib/signature.ts` holds it (5 kB, lifted from a photo: blue ink
+  kept, paper and ruled lines dropped). Anything under `public/` is served
+  to anyone with the URL, logged in or not, and a signature at a public
+  address is a forgery kit. It prints on invoices only — an estimate is
+  signed when it is accepted. It is his alone: before a second user, it
+  must become per-account storage or every business signs as him.
+- **A5 is the A4 sheet, scaled — not a second layout.** "Print on A5"
+  injects `@page { size: A5 }` for that one print and adds `.print-a5`,
+  which `zoom`s the `.doc` to 0.72 and drops the filler rows. `zoom`, not
+  `transform`, because it shrinks the layout box too. A 15-line bill fits
+  one half sheet; longer ones run on with their headings repeated. Change
+  the A4 sheet and the A5 one follows — which is the point.
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.
