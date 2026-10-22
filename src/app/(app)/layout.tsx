@@ -23,9 +23,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/labour", label: t.labour, icon: "labour" },
     { href: "/settings", label: t.settings, icon: "settings" },
   ];
+  // pb-28 keeps the last thing on a screen clear of the nav bar. On paper
+  // there is no nav bar, and those 7rem were still laid out under the bill:
+  // a 7-line bill whose foot fitted with room to spare broke onto a second
+  // page, foot alone, once the signature added its 2.4rem. print:pb-0.
   return (
     <div className="mx-auto min-h-screen max-w-3xl">
-      <div className="rise px-4 pb-28 pt-4">{children}</div>
+      <div className="rise px-4 pb-28 pt-4 print:pb-0 print:pt-0">{children}</div>
       <NavBar items={items} />
     </div>
   );

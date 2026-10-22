@@ -783,11 +783,6 @@ export default async function DocumentViewPage({
                   </td>
                 </tr>
               )}
-              {/* Runs the grid down the page the way a printed form does,
-                  so a four-line bill still reads as a document. */}
-              <tr className="doc-grid-filler" aria-hidden>
-                <td colSpan={gridCols} />
-              </tr>
             </tbody>
             <tfoot>
               <tr className="doc-grid-total">

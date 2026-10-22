@@ -568,20 +568,12 @@ button.card:active {
   vertical-align: top;
 }
 
-/* Runs the ruled grid down the page, so a four-line bill still reads
-   as a printed form rather than as a receipt. Screen has no page to
-   fill, so it only appears on paper. */
-.doc-grid-filler {
-  display: none;
-}
-@media print {
-  .doc-grid-filler {
-    display: table-row;
-  }
-  .doc-grid-filler > td {
-    height: 5rem;
-  }
-}
+/* There used to be a blank 5rem "filler" row here, printed under the
+   items to run the grid down the page like a printed form. It is gone on
+   purpose: in Chrome's print layout it sent the foot to a page of its own
+   on 16 of his 61 bills — INV-2026-040, 15 lines, had a third of A4 empty
+   and still broke. A short bill printing short is fine; a foot alone on
+   page two is not. */
 
 .doc-grid-total > td {
   border-top: 1.5px solid var(--doc-ink);
@@ -787,8 +779,16 @@ button.card:active {
   .doc-table thead {
     display: table-header-group;
   }
+  /* TOTAL prints once, at the end — as a footer group Chrome is free to
+     leave it on a page with no item rows above it. */
   .doc-grid tfoot {
-    display: table-footer-group;
+    display: table-row-group;
+  }
+  /* The last two items and the TOTAL row go over together, so a second
+     page never opens on a bare TOTAL and the foot. */
+  .doc-grid tbody tr:nth-last-child(-n + 2),
+  .doc-grid-total {
+    break-before: avoid;
   }
   /* The grid fits the page on paper — never a scrollbar, never clipped. */
   .doc-table-wrap {
@@ -798,12 +798,27 @@ button.card:active {
     font-size: 0.68rem;
     table-layout: auto;
   }
+  /* Rows a little tighter on paper than on screen: across his 61 bills
+     this is the difference between 16 lines fitting one A4 sheet or not. */
+  .doc-grid tbody td {
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
+  }
   /* The letterhead and the foot are each one block of the page. */
   .doc-letterhead,
   .doc-banner,
   .doc-parties,
   .doc-foot {
     break-inside: avoid;
+  }
+  /* And when a bill truly needs two pages, the foot must not arrive on
+     the second one alone: no break directly before it, so the last item
+     rows and the TOTAL row travel over with it, under repeated headings. */
+  .doc-foot {
+    break-before: avoid;
+  }
+  .doc-table-wrap {
+    break-after: avoid;
   }
   .doc-table tr {
     break-inside: avoid;
@@ -816,13 +831,9 @@ button.card:active {
      because it shrinks the layout box too, so the bill lays out at its
      A4 width and then occupies the half sheet — no second layout to keep
      in step with the first. 136mm of A5 against 190mm of A4 is 0.72,
-     and at that a 15-line bill (INV-2026-040) fits one sheet once the
-     blank filler rows — there to give an A4 bill some body — are gone.
-     A longer bill runs onto a second sheet with its headings repeated. */
+     and at that a 15-line bill (INV-2026-040) fits one sheet. A longer
+     bill runs onto a second sheet with its headings repeated. */
   .print-a5 .doc {
     zoom: 0.72;
-  }
-  .print-a5 .doc-grid-filler {
-    display: none;
   }
 }

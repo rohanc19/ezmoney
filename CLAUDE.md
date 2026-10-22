@@ -704,6 +704,29 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   `transform`, because it shrinks the layout box too. A 15-line bill fits
   one half sheet; longer ones run on with their headings repeated. Change
   the A4 sheet and the A5 one follows — which is the point.
+- **The foot must never start a page alone — and it did, on 16 of 61
+  bills.** Two causes, both print-only: the app wrapper's `pb-28` (room
+  for the nav bar) laid out under every bill, and a blank 5rem "filler"
+  row under the items, which in Chrome's print layout sent the foot to
+  page two with a third of A4 still empty. `print:pb-0` in
+  `(app)/layout.tsx`; the filler is gone. When a bill genuinely needs two
+  pages, the last two item rows and TOTAL go over with the foot
+  (`break-before: avoid`) under repeated headings, and TOTAL is a row
+  group, not a footer group, so it prints once at the end. Printed rows
+  are tighter than on screen. Result across all 61: one A4 page up to
+  ~16 lines, and no page anywhere that opens on a bare foot.
+- **Checking print: `tools/print_check.py`.** Run it after any change to
+  the bill or `globals.css`. It prints every bill at A4, Letter and A5
+  with headless Chrome against the dev server and fails if a foot starts
+  a page with fewer than two item rows. The bills are behind the login,
+  so: `python3 tools/print_check.py serve /tmp/bills`, then in a
+  logged-in tab on localhost:3000 run, for each `[serial, id]` from
+  `select serial_no, id from documents`:
+  `fetch('/documents/'+id).then(r=>r.text()).then(h=>fetch('http://127.0.0.1:8765/'+serial,{method:'POST',body:h}))`,
+  then `python3 tools/print_check.py /tmp/bills /tmp/print-out`.
+  Needs PyMuPDF. His Android phone prints on **Letter** by default
+  (18mm shorter than A4, and it ignores `@page size`), which is why
+  Letter is in the sweep — and why he should pick A4 in its print screen.
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.
