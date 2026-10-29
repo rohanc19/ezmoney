@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IS_DEMO } from "@/lib/demo";
 import { notFound } from "next/navigation";
 import DocumentForm from "@/components/DocumentForm";
 import { saveDocument } from "@/lib/actions";
@@ -77,6 +78,7 @@ export default async function EditDocumentPage({ params }: { params: { id: strin
         priceHints={priceHints}
         ownRates={ownRates}
         t={t}
+        canScan={!IS_DEMO}
       />
     </main>
   );

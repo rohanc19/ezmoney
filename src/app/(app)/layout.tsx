@@ -1,4 +1,5 @@
 import NavBar, { type NavIcon } from "@/components/NavBar";
+import { IS_DEMO } from "@/lib/demo";
 import { getDict } from "@/lib/i18n";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,19 +17,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Seven also did not fit: at 360px, the commonest Android width, there
   // is 47.4px for a label and "Expenses" measures 47.8px in Manrope bold,
   // so it truncated. Six or fewer fits every phone down to 320px.
-  const items: { href: string; label: string; icon: NavIcon }[] = [
+  const all: { href: string; label: string; icon: NavIcon }[] = [
     { href: "/", label: t.home, icon: "home" },
     { href: "/new", label: t.newDoc, icon: "new" },
     { href: "/day", label: t.today, icon: "today" },
     { href: "/labour", label: t.labour, icon: "labour" },
     { href: "/settings", label: t.settings, icon: "settings" },
   ];
+  // The demo is an invoicing app: Today and Labour are his trade's.
+  const items = IS_DEMO ? all.filter((i) => i.icon !== "today" && i.icon !== "labour") : all;
   // pb-28 keeps the last thing on a screen clear of the nav bar. On paper
   // there is no nav bar, and those 7rem were still laid out under the bill:
   // a 7-line bill whose foot fitted with room to spare broke onto a second
   // page, foot alone, once the signature added its 2.4rem. print:pb-0.
   return (
     <div className="mx-auto min-h-screen max-w-3xl">
+      {IS_DEMO && (
+        <p className="no-print bg-amber-100 px-4 py-1.5 text-center text-xs font-semibold text-amber-900">
+          Demo copy · sample data · anything you add here is visible to the next person trying it
+        </p>
+      )}
       <div className="rise px-4 pb-28 pt-4 print:pb-0 print:pt-0">{children}</div>
       <NavBar items={items} />
     </div>

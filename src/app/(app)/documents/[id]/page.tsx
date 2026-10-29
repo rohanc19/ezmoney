@@ -15,6 +15,7 @@ import { amountInWords, formatDate, formatINR, formatIndianNumber, todayISO } fr
 import { computeLineTaxes, computeTotals } from "@/lib/gst";
 import { docLabels, getDict } from "@/lib/i18n";
 import { buildBillEmail, waLink } from "@/lib/share";
+import { IS_DEMO } from "@/lib/demo";
 import { SIGNATURE_DATA_URI } from "@/lib/signature";
 import { supabaseServer } from "@/lib/supabase/server";
 import { buildUpiUri, upiQrSvg } from "@/lib/upi";
@@ -974,7 +975,7 @@ export default async function DocumentViewPage({
               {/* He asked for his signature on every invoice. Not on an
                   estimate: a quote is signed when it is accepted, which is
                   what the "Approved by" line below is for. */}
-              {isInvoice && (
+              {isInvoice && !IS_DEMO && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={SIGNATURE_DATA_URI} alt="" className="doc-sign-img" />
               )}

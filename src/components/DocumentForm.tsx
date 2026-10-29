@@ -60,6 +60,8 @@ interface Props {
   priceHints: PriceHint[];
   ownRates: OwnRate[];
   t: Dict;
+  /** False where no OCR key is configured (the demo copy). */
+  canScan?: boolean;
 }
 
 const emptyItem = (hsn: string, section = ""): ItemState => ({
@@ -89,6 +91,7 @@ export default function DocumentForm({
   priceHints,
   ownRates,
   t,
+  canScan = true,
 }: Props) {
   const draftKey = `ezmoney-draft-${id ?? "new-" + type}${variant ? `-${variant}` : ""}`;
   const [items, setItems] = useState<ItemState[]>(
@@ -457,7 +460,7 @@ export default function DocumentForm({
 
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <RatePicker items={rateCard} t={t} onPick={addFromRateCard} />
-          <ScanSheet t={t} onAdd={addFromScan} />
+          {canScan && <ScanSheet t={t} onAdd={addFromScan} />}
           <MaterialsPicker
             purchases={unbilled}
             clientId={clientId}

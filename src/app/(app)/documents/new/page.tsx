@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IS_DEMO } from "@/lib/demo";
 import DocumentForm from "@/components/DocumentForm";
 import { saveDocument } from "@/lib/actions";
 import { getDict } from "@/lib/i18n";
@@ -88,6 +89,7 @@ export default async function NewDocumentPage({
         priceHints={priceHints}
         ownRates={ownRates}
         t={t}
+        canScan={!IS_DEMO}
       />
     </main>
   );

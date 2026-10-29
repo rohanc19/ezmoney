@@ -730,6 +730,16 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
 - **Print CSS matters as much as screen CSS.** `.no-print` hides app furniture;
   `.print-page` strips card styling. Test any invoice change with an actual
   print preview, not just on screen.
+- **There is a demo copy, and it shares this code but nothing else.**
+  Supabase project "EzMoney Demo" (`hxfgweesgrajacknedbd`, same org,
+  Singapore) and its own Vercel project, with `DEMO_MODE=1`. That flag
+  (`src/lib/demo.ts`, server-only) hides his signature, Today, Labour,
+  the points sheet and the bill scanner, and puts a one-line banner on
+  top. Its data is a made-up website studio, `supabase/demo_seed.sql`,
+  which wipes and reloads the demo user's rows — run it in the demo's
+  SQL editor to reset whatever visitors typed. **Never run it, or point
+  `DEMO_MODE` at, his project.** A migration for his database has to be
+  run on the demo's too, or the demo breaks on the next push.
 
 ## Shipping changes
 
