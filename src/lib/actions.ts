@@ -11,6 +11,7 @@ import { suggestForRateCard } from "@/lib/spelling-rate-card";
 import { supabaseServer } from "@/lib/supabase/server";
 import { splitDay } from "@/lib/split";
 import { STATES } from "@/lib/types";
+import { IS_DEMO } from "@/lib/demo";
 
 // ---------- auth ----------
 
@@ -39,6 +40,23 @@ export async function login(formData: FormData) {
   const configured = (process.env.APP_LOGIN_EMAIL ?? "").trim();
   const email = configured || String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) redirect("/login?error=1");
+  redirect("/");
+}
+
+/**
+ * The demo copy's door: one tap, no password to pass around. The demo
+ * account's password lives in `DEMO_PASSWORD` on the demo's Vercel project
+ * and nowhere else, and this is still a real Supabase sign-in, for the
+ * same RLS reason as above. On his app `DEMO_MODE` is unset, so this does
+ * nothing but send the visitor back to the login screen.
+ */
+export async function demoLogin() {
+  const password = process.env.DEMO_PASSWORD ?? "";
+  const email = (process.env.APP_LOGIN_EMAIL ?? "").trim();
+  if (!IS_DEMO || !password || !email) redirect("/login?error=1");
+  const supabase = supabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect("/login?error=1");
   redirect("/");

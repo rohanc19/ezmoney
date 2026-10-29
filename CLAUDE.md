@@ -735,7 +735,10 @@ public/fonts/                       Manrope, Kannada, and the ₹ glyph fallback
   Singapore) and its own Vercel project, with `DEMO_MODE=1`. That flag
   (`src/lib/demo.ts`, server-only) hides his signature, Today, Labour,
   the points sheet and the bill scanner, and puts a one-line banner on
-  top. Its data is a made-up website studio, `supabase/demo_seed.sql`,
+  top. The login screen is one "Try the demo" button: `demoLogin` signs
+  in with `DEMO_PASSWORD`, set only on the demo's Vercel project, so
+  there is no password to hand out — and it is still a real Supabase
+  session. Its data is a made-up website studio, `supabase/demo_seed.sql`,
   which wipes and reloads the demo user's rows — run it in the demo's
   SQL editor to reset whatever visitors typed. **Never run it, or point
   `DEMO_MODE` at, his project.** A migration for his database has to be

@@ -1,4 +1,5 @@
-import { login } from "@/lib/actions";
+import { demoLogin, login } from "@/lib/actions";
+import { IS_DEMO } from "@/lib/demo";
 import { getDict } from "@/lib/i18n";
 
 export default function LoginPage({ searchParams }: { searchParams: { error?: string } }) {
@@ -22,39 +23,50 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
           </p>
         )}
 
-        <form action={login} className="mt-8 space-y-5">
-          {!emailConfigured && (
+        {IS_DEMO ? (
+          <form action={demoLogin} className="mt-8 space-y-3">
+            <button type="submit" className="btn-primary w-full text-xl">
+              Try the demo
+            </button>
+            <p className="text-center text-sm text-stone-500">
+              Sample data for a made-up business. No sign-up.
+            </p>
+          </form>
+        ) : (
+          <form action={login} className="mt-8 space-y-5">
+            {!emailConfigured && (
+              <div>
+                <label htmlFor="email" className="label">
+                  {t.email}
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="field"
+                />
+              </div>
+            )}
             <div>
-              <label htmlFor="email" className="label">
-                {t.email}
+              <label htmlFor="password" className="label">
+                {t.password}
               </label>
               <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
                 required
                 className="field"
               />
             </div>
-          )}
-          <div>
-            <label htmlFor="password" className="label">
-              {t.password}
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="field"
-            />
-          </div>
-          <button type="submit" className="btn-primary w-full text-xl">
-            {t.login}
-          </button>
-        </form>
+            <button type="submit" className="btn-primary w-full text-xl">
+              {t.login}
+            </button>
+          </form>
+        )}
       </div>
     </main>
   );
